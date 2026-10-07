@@ -21,7 +21,7 @@ Families use the first package ID segment by default. You can select a narrower 
 
 Choose the `latest`, `minor`, or `patch` policy. Stable releases are the default; prereleases are optional. Updates require a trusted workspace. The extension applies version text through VS Code documents, preserving surrounding formatting. Files that were clean are saved; files that already had unsaved edits remain unsaved. A changed document invalidates the full review before edits are applied. Changing a central version affects all projects that consume it.
 
-The VS Code display name is **NuGet Package Manager** and the extension ID is `managedcode.managedcode-nuget-package-manager`. Install a released `.vsix` from [GitHub Releases](https://github.com/managedcode/NuGetPackageManager/releases) using **Extensions → … → Install from VSIX…**. Release notes distinguish preview artifacts from verified public NuGet publication.
+The VS Code display name is **NuGet Package Manager by ManagedCode** and the extension ID is `managedcode.managedcode-nuget-package-manager`. Install a released `.vsix` from [GitHub Releases](https://github.com/managedcode/NuGetPackageManager/releases) using **Extensions → … → Install from VSIX…**. Release notes distinguish preview artifacts from verified public NuGet publication.
 
 The extension supports VS Code 1.100 or later and requires the .NET 10 runtime to run its bundled engine. Install the runtime using Microsoft's [.NET download instructions](https://dotnet.microsoft.com/download/dotnet/10.0). No Node.js installation is needed to use the extension.
 

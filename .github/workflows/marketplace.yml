@@ -78,7 +78,7 @@ jobs:
           VSIX="artifacts/managedcode-nuget-package-manager-$VERSION.vsix"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "managedcode-nuget-package-manager-$VERSION.vsix" --dir artifacts
           unzip -p "$VSIX" extension/package.json > "$RUNNER_TEMP/vsix-manifest.json"
-          node -e 'const p=require(process.env.RUNNER_TEMP+"/vsix-manifest.json"); if(p.version!==process.env.RELEASE_TAG.slice(1)||p.publisher!=="managedcode"||p.name!=="managedcode-nuget-package-manager") throw Error("Released VSIX identity/version mismatch");'
+          node -e 'const p=require(process.env.RUNNER_TEMP+"/vsix-manifest.json"); if(p.version!==process.env.RELEASE_TAG.slice(1)||p.publisher!=="managedcode"||p.name!=="managedcode-nuget-package-manager"||p.displayName!=="NuGet Package Manager by ManagedCode") throw Error("Released VSIX identity/display name/version mismatch");'
           echo "path=$VSIX" >> "$GITHUB_OUTPUT"
       - run: npm ci --ignore-scripts
       - name: Sign in with the federated Marketplace identity
