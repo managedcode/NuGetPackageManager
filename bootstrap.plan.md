@@ -22,4 +22,6 @@ Integration evidence before delivery: TASK-005 shared engine/CLI complete (12 .N
 
 Integration failure resolved: the first Developer typecheck found two obsolete TypeScript engine files left by an earlier copy. Removed only those superseded files, preserving the single shared .NET implementation; the complete integrated check then passed.
 
+Hosted integration repair: the initial Windows formatting gate exposed CRLF checkout conversion despite the repository LF policy. Added `.gitattributes` to keep tracked text in LF on every platform; binary PNG assets remain binary. The host suite now saves only generated fixture documents after dirty-buffer assertions so the isolated test editor can close normally; VS Code 1.100 exited successfully.
+
 Browser evidence: dark/light rendering; 960px three adjacent panes, no horizontal overflow, visible action footer; 720px inspector drawer; Microsoft.Orleans bulk review includes all three rows even with Hosting filter, excluding Microsoft.OrleansExtra. Preview bridge is explicitly illustrative and does not prove editor writes.
