@@ -1,6 +1,6 @@
 # Release operations
 
-The release flow versions the VS Code extension and `nuget-manager` tool together, verifies a successful main-branch build, publishes a version-tagged GitHub release, and can then publish the exact released VSIX to the VS Code Marketplace. NuGet and GitHub release success do not imply Marketplace publication. The technical extension name is `managedcode-nuget-package-manager`, its VS Code ID is `managedcode.managedcode-nuget-package-manager`, and its display name remains **NuGet Package Manager**. Marketplace credentials are not yet verified; automatic publication, including the first publication, can be enabled after the publisher identity is connected and verified once.
+The release flow versions the VS Code extension and `nuget-manager` tool together, verifies a successful main-branch build, publishes a version-tagged GitHub release, and can then publish the exact released VSIX to the VS Code Marketplace. NuGet and GitHub release success do not imply Marketplace publication. The technical extension name is `managedcode-nuget-package-manager`, its VS Code ID is `managedcode.managedcode-nuget-package-manager`, and its display name remains **NuGet Package Manager**. Marketplace publication is pending the publisher account connection; the publishing job currently has no authentication configuration. Automatic publication, including the first publication, can be enabled after the publisher identity is connected and verified once.
 
 ## Version and GitHub release
 
@@ -18,7 +18,9 @@ Release builds and validates the version-matched VSIX and NuGet tool package, th
 
 ### Current 0.1.1 extension identity repair
 
-The extension technical name changed to `managedcode-nuget-package-manager` to resolve a Marketplace name collision. This is a one-time VSIX identity repair at unchanged version 0.1.1. Use `managedcode-nuget-package-manager-0.1.1.vsix`, qualify it from its producing commit, and upload that artifact to the existing GitHub `v0.1.1` release with the producing commit recorded. Preserve the existing `v0.1.1` tag and `nuget-manager` CLI package; do not create a new version or tag for this repair.
+The extension technical name changed to `managedcode-nuget-package-manager` to resolve a Marketplace name collision. This is a one-time VSIX identity repair at unchanged version 0.1.1. The [corrected VSIX](https://github.com/managedcode/NuGetPackageManager/releases/download/v0.1.1/managedcode-nuget-package-manager-0.1.1.vsix) is attached to the existing public GitHub release. Its producing commit d77a4403c790ec0ae705f0dba94e9e60e0bded10 passed [CI on Linux, macOS and Windows](https://github.com/managedcode/NuGetPackageManager/actions/runs/37675365059), and its commit/hash provenance is recorded in the release notes. The obsolete VSIX with the colliding name was removed. The existing `v0.1.1` tag and `nuget-manager` CLI package are preserved; no new version or tag was created for this repair.
+
+[Marketplace run 37675793048](https://github.com/managedcode/NuGetPackageManager/actions/runs/37675793048) failed at **Require publisher authentication** before any upload. Neither `MARKETPLACE_AZURE_CLIENT_ID`/`MARKETPLACE_AZURE_TENANT_ID` nor `VSCE_PAT` was available to the job. Complete one authentication path below, then run **Marketplace** from GitHub Actions with `release_tag=v0.1.1` at `main`. Enable `MARKETPLACE_PUBLISH=true` after verifying publication for future explicitly chosen releases. No Marketplace listing or publication is claimed yet.
 
 ## Marketplace publishing
 
