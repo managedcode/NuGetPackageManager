@@ -2,7 +2,7 @@
   "name": "nuget-package-manager",
   "displayName": "NuGet Package Manager",
   "description": "Review and update NuGet dependencies by package family, version scope, and declaration file.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "managedcode",
   "license": "MIT",
   "engines": {

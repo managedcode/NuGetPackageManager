@@ -13,7 +13,11 @@ public sealed class NuGetFeeds : IDisposable
       "RegistrationsBaseUrl/3.6.0", "RegistrationsBaseUrl/3.4.0", "RegistrationsBaseUrl/3.0.0-rc",
         "RegistrationsBaseUrl/3.0.0-beta", "RegistrationsBaseUrl"
   ];
-  private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false });
+  private readonly HttpClient _http = new(new HttpClientHandler
+  {
+    AllowAutoRedirect = false,
+    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
+  });
 
   public async Task<IReadOnlyList<string>> GetVersionsAsync(string packageId, IReadOnlyList<Feed> feeds, CancellationToken cancellationToken = default)
   {

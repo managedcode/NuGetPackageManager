@@ -33,6 +33,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           dotnet tool install --tool-path "$RUNNER_TEMP/tools" --add-source artifacts nuget-manager --version "$VERSION"
           "$RUNNER_TEMP/tools/nuget-manager" --help
+          node scripts/verify-live-feed.mjs "$RUNNER_TEMP/tools/nuget-manager"
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
@@ -99,6 +100,9 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
       - uses: actions/download-artifact@v4
         with:
           name: release-packages
@@ -120,14 +124,15 @@ jobs:
           VERSION_LOWER=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
           PACKAGE_URL="https://api.nuget.org/v3-flatcontainer/nuget-manager/$VERSION_LOWER/nuget-manager.nuspec"
           for attempt in $(seq 1 20); do
-            if curl --fail --silent --show-error "$PACKAGE_URL" -o /dev/null; then
+            if curl --fail --silent --show-error "$PACKAGE_URL" -o /dev/null && \
+              dotnet tool install --tool-path "$RUNNER_TEMP/published-tools" nuget-manager --version "$VERSION" --no-http-cache --source https://api.nuget.org/v3/index.json; then
               break
             fi
             if [[ "$attempt" == 20 ]]; then
-              echo "nuget-manager $VERSION did not become available on NuGet.org within 10 minutes." >&2
+              echo "nuget-manager $VERSION could not be installed from NuGet.org within 10 minutes." >&2
               exit 1
             fi
             sleep 30
           done
-          dotnet tool install --tool-path "$RUNNER_TEMP/published-tools" nuget-manager --version "$VERSION" --add-source https://api.nuget.org/v3/index.json
           "$RUNNER_TEMP/published-tools/nuget-manager" --help
+          node scripts/verify-live-feed.mjs "$RUNNER_TEMP/published-tools/nuget-manager"

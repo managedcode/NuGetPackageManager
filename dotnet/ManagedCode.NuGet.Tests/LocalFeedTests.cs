@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -17,6 +18,38 @@ public sealed class LocalFeedTests
     using var client = new NuGetFeeds();
     var versions = await client.GetVersionsAsync("Microsoft.Orleans.Core", [new Feed("local", feed.IndexUrl)], TestContext.Current.CancellationToken);
     Assert.Equal(["1.0.0", "1.1.0"], versions);
+  }
+
+  [Theory]
+  [InlineData("gzip")]
+  [InlineData("deflate")]
+  [InlineData("br")]
+  public async Task CompressedFeedReturnsOnlyListedRegistrationVersions(string encoding)
+  {
+    await using var feed = new LocalFeed(contentEncoding: encoding);
+    using var client = new NuGetFeeds();
+    var versions = await client.GetVersionsAsync("Microsoft.Orleans.Core", [new Feed("local", feed.IndexUrl)], TestContext.Current.CancellationToken);
+    Assert.Equal(["1.0.0", "1.1.0"], versions);
+  }
+
+  [Fact]
+  public async Task InvalidCompressedFeedFailsInsteadOfAppearingCurrent()
+  {
+    await using var feed = new LocalFeed(contentEncoding: "gzip", malformedCompression: true);
+    using var client = new NuGetFeeds();
+    var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        client.GetVersionsAsync("Microsoft.Orleans.Core", [new Feed("local", feed.IndexUrl)], TestContext.Current.CancellationToken));
+    Assert.StartsWith("local:", error.Message);
+  }
+
+  [Fact]
+  public async Task DecompressedFeedResponseStillHonorsSizeLimit()
+  {
+    await using var feed = new LocalFeed(contentEncoding: "gzip", oversizedDecoded: true);
+    using var client = new NuGetFeeds();
+    var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        client.GetVersionsAsync("Microsoft.Orleans.Core", [new Feed("local", feed.IndexUrl)], TestContext.Current.CancellationToken));
+    Assert.Contains("size limit", error.Message);
   }
 
   [Fact]
@@ -176,13 +209,20 @@ public sealed class LocalFeedTests
     private readonly Task _server;
     private readonly bool _failFlat;
     private readonly Action? _onFlat;
+    private readonly string? _contentEncoding;
+    private readonly bool _malformedCompression;
+    private readonly bool _oversizedDecoded;
     private int _flatCount;
     public string IndexUrl { get; }
 
-    public LocalFeed(bool failFlat = false, Action? onFlat = null)
+    public LocalFeed(bool failFlat = false, Action? onFlat = null, string? contentEncoding = null,
+        bool malformedCompression = false, bool oversizedDecoded = false)
     {
       _failFlat = failFlat;
       _onFlat = onFlat;
+      _contentEncoding = contentEncoding;
+      _malformedCompression = malformedCompression;
+      _oversizedDecoded = oversizedDecoded;
       _listener.Start();
       var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
       IndexUrl = $"http://127.0.0.1:{port}/v3/index.json";
@@ -208,8 +248,14 @@ public sealed class LocalFeedTests
                 while (!string.IsNullOrEmpty(await reader.ReadLineAsync())) { }
                 var path = first?.Split(' ')[1] ?? "";
                 var (status, json) = Respond(root, path);
+                if (_oversizedDecoded && path.StartsWith("/reg/", StringComparison.Ordinal))
+                  json += new string(' ', 5_000_001);
                 var body = Encoding.UTF8.GetBytes(json);
-                var header = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n");
+                if (_contentEncoding is not null)
+                  body = _malformedCompression && path.StartsWith("/reg/", StringComparison.Ordinal)
+                    ? body : Compress(body, _contentEncoding);
+                var encodingHeader = _contentEncoding is null ? "" : $"Content-Encoding: {_contentEncoding}\r\n";
+                var header = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\nContent-Type: application/json\r\n{encodingHeader}Content-Length: {body.Length}\r\nConnection: close\r\n\r\n");
                 await stream.WriteAsync(header);
                 await stream.WriteAsync(body);
               }
@@ -219,6 +265,19 @@ public sealed class LocalFeedTests
         }
       }
       catch (OperationCanceledException) { }
+    }
+
+    private static byte[] Compress(byte[] body, string encoding)
+    {
+      using var output = new MemoryStream();
+      using (Stream compressor = encoding switch
+      {
+        "gzip" => new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true),
+        "deflate" => new DeflateStream(output, CompressionLevel.SmallestSize, leaveOpen: true),
+        "br" => new BrotliStream(output, CompressionLevel.SmallestSize, leaveOpen: true),
+        _ => throw new ArgumentOutOfRangeException(nameof(encoding))
+      }) compressor.Write(body);
+      return output.ToArray();
     }
 
     private (string Status, string Body) Respond(string root, string path)
