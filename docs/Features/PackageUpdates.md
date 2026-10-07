@@ -1,6 +1,6 @@
 # PackageUpdates
 
-Status: implemented and verified locally; hosted CI and public NuGet publication pending. Owner: lead. ADR: [ADR-0002](../ADR/ADR-0002-shared-dotnet-engine.md). Acceptance source: [bootstrap.acceptance.md](../../bootstrap.acceptance.md).
+Status: implemented and delivered in 0.1.1; three-platform CI, GitHub VSIX and fresh public NuGet installation/live family update verified. Owner: lead. ADR: [ADR-0002](../ADR/ADR-0002-shared-dotnet-engine.md). Acceptance source: [bootstrap.acceptance.md](../../bootstrap.acceptance.md).
 
 REQ-001 (functional, must): discover literal NuGet declaration ownership. AC-001. Unsupported expressions and invalid XML are visible, never silently editable.
 REQ-002 (functional, must): offer numerically newer listed versions within selected update policy. AC-002/003. Stable is default; unlisted metadata cannot be recommended.

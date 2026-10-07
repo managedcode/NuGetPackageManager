@@ -48,7 +48,7 @@ The supported options are:
 | `--json`                                           | Emit machine-readable output                                                                  |
 | `--yes`                                            | Apply selected updates in noninteractive mode; use only when you intend to write files        |
 
-See `nuget-manager --help` for the installed tool's current usage. Package publication is pending; a local build or packed tool does not make this global install available from NuGet.
+See `nuget-manager --help` for the installed tool's current usage. Version 0.1.1 is published on NuGet.org and verified by a fresh install and live-feed family update. A local build or packed tool alone is insufficient publication evidence.
 
 ## UI preview and npm scripts
 

@@ -1,6 +1,6 @@
 # ADR-0002: Shared .NET engine and two delivery hosts
 
-Status: Accepted; implementation verified locally, hosted verification and public NuGet publication pending.
+Status: Accepted and delivered in 0.1.1; local and three-platform hosted verification, GitHub VSIX and public NuGet installation/update passed.
 Date: 2026-10-07. Supersedes [0001](0001-native-workbench.md).
 Related requirements: REQ-001 through REQ-007; AC-001 through AC-009 in [PackageUpdates](../Features/PackageUpdates.md).
 
@@ -35,6 +35,6 @@ Ordered implementation contract:
 
 Lead owns shared contracts and final joins using native collaboration status/wait tools. Workers escalate conflicting ownership, security ambiguity or failing verification. No parallel owner edits a shared file. Root plans/specs are updated before starting workers.
 
-Verification: .NET Release build, engine and CLI regressions, dotnet format verification, npm typecheck/tests/build/format, actual VS Code host suite, dark/light/narrow browser interaction, VSIX package inspection and a packed global-tool install. Check family selection against adjacent prefixes and multi-file stale plans. Release uses tag v0.1.0, produces both VSIX and nupkg, and publishes the NuGet tool using the organization's configured credential. Verify actual NuGet availability and install from the intended feed before calling publication complete. Missing secrets/publisher access is an explicit blocker, never simulated success.
+Verification: .NET Release build, engine and CLI regressions, dotnet format verification, npm typecheck/tests/build/format, actual VS Code host suite, dark/light/narrow browser interaction, VSIX package inspection and a packed global-tool install. Check family selection against adjacent prefixes and multi-file stale plans. Release uses tag v0.1.1, produces both VSIX and nupkg, and publishes the NuGet tool using the organization's configured credential. Verify actual NuGet availability and install from the intended feed before calling publication complete. Missing secrets/publisher access is an explicit blocker, never simulated success.
 
-Rollout: this is an unreleased product, so remove the TS engine in the same initial release. Runtime and CLI requirements appear in README and actionable errors. Rollback uninstalls either host and reverts reviewed package-file changes. Preserve dirty buffers, BOM, CRLF, conditional declarations and trust restrictions. Declarative UI templates and cohesive host controller may exceed starter LOC limits; split when a second feature introduces separate state ownership. No separate source repository or copied private PR code.
+Rollout: the initial release removed the TS engine and shipped the shared .NET engine to both hosts. Runtime and CLI requirements appear in README and actionable errors. Rollback uninstalls either host and reverts reviewed package-file changes. Preserve dirty buffers, BOM, CRLF, conditional declarations and trust restrictions. Declarative UI templates and cohesive host controller may exceed starter LOC limits; split when a second feature introduces separate state ownership. No separate source repository or copied private PR code.
