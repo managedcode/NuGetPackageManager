@@ -78,6 +78,22 @@ function versionLine(text: string, packageId: string): string | undefined {
   return text.split(/\r?\n/).find((line) => line.includes(packageId));
 }
 
+function waitForDocumentText(uri: vscode.Uri, expected: string, timeoutMs = 5000): Promise<vscode.TextDocument> {
+  return new Promise((resolve, reject) => {
+    let timer: NodeJS.Timeout;
+    const listener = vscode.workspace.onDidChangeTextDocument((event) => {
+      if (event.document.uri.toString() !== uri.toString() || event.document.getText() !== expected) return;
+      clearTimeout(timer);
+      listener.dispose();
+      resolve(event.document);
+    });
+    timer = setTimeout(() => {
+      listener.dispose();
+      reject(new Error(`Timed out waiting for the editor undo event for ${uri.toString()}.`));
+    }, timeoutMs);
+  });
+}
+
 export async function run(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(folder, 'host test runner must open its isolated fixture workspace');
@@ -184,50 +200,62 @@ export async function run(): Promise<void> {
     await workbench.review([refreshedCentral.key]);
     assert.equal(workbench.getState().plan.length, 1);
 
-    const repeatedReview = workbench.review([refreshedCentral.key]);
-    assert.equal(workbench.getState().plan, undefined, 'starting a second review must clear the earlier plan');
-    const malformedDocument = await vscode.workspace.openTextDocument(malformedUri);
-    const malformedEditor = await vscode.window.showTextDocument(malformedDocument);
-    await malformedEditor.edit((edit) => edit.insert(new vscode.Position(0, 0), ' '));
-    const invalidatedCentral = workbench
-      .getState()
-      .rows.find((row: { key: string }) => row.key === refreshedCentral.key);
-    assert.equal(invalidatedCentral.status, 'unchecked');
-    assert.deepEqual(invalidatedCentral.versions, []);
-    await assert.rejects(repeatedReview, /changed after discovery|changed during review/i);
-    assert.equal(workbench.getState().plan, undefined, 'a failed second review must not restore the earlier plan');
-    let centralText = (await vscode.workspace.openTextDocument(centralUri)).getText();
-    assert.match(
-      versionLine(centralText, 'Central.Package') ?? '',
-      /Version="1\.0\.0"/,
-      'a changed nonselected malformed project must reject review without editing the selected file',
-    );
-
-    await workbench.refresh(true);
-    state = workbench.getState();
-    const afterMalformedChange = state.rows.find((row: { packageId: string }) => row.packageId === 'Central.Package');
-    assert.ok(afterMalformedChange && afterMalformedChange.status === 'update');
-    await workbench.review([afterMalformedChange.key]);
-    assert.deepEqual(
-      workbench.getState().plan.map((change: { key: string }) => change.key),
-      [afterMalformedChange.key],
-    );
     await workbench.apply();
-    centralText = (await vscode.workspace.openTextDocument(centralUri)).getText();
+    let centralText = (await vscode.workspace.openTextDocument(centralUri)).getText();
     projectText = (await vscode.workspace.openTextDocument(projectUri)).getText();
     assert.match(versionLine(centralText, 'Central.Package') ?? '', /Version="2\.0\.0"/);
     assert.match(versionLine(projectText, 'Regular.Package') ?? '', /Version="1\.0\.0"/);
     assert.match(centralText, /<!-- preserve this comment -->\r\n/);
     assert.equal(centralText.includes('\n') && !centralText.includes('\r\n'), false, 'central file must retain CRLF');
+    assert.match(await readFile(centralUri.fsPath, 'utf8'), /Version="2\.0\.0"/);
 
-    await vscode.window.showTextDocument(centralUri);
+    const expectedAfterUndo = centralText.replace('Version="2.0.0"', 'Version="1.0.0"');
+    assert.notEqual(expectedAfterUndo, centralText, 'the expected undo must change the selected version');
+    await vscode.window.showTextDocument(centralUri, { preview: false });
+    assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), centralUri.toString());
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    const undoEvent = waitForDocumentText(centralUri, expectedAfterUndo);
     await vscode.commands.executeCommand('undo');
-    centralText = (await vscode.workspace.openTextDocument(centralUri)).getText();
-    assert.match(
-      versionLine(centralText, 'Central.Package') ?? '',
-      /Version="1\.0\.0"/,
-      'editor undo must revert the applied version edit',
+    centralText = (await undoEvent).getText();
+    assert.equal(centralText, expectedAfterUndo, 'one editor undo must revert the applied package version');
+    assert.equal(await readFile(centralUri.fsPath, 'utf8'), centralText.replace('Version="1.0.0"', 'Version="2.0.0"'));
+    const centralDocument = await vscode.workspace.openTextDocument(centralUri);
+    await centralDocument.save();
+
+    await workbench.refresh(true);
+    const policyForDirtyUndo = workbench
+      .getState()
+      .rows.find((row: { packageId: string }) => row.packageId === 'Policy.Package');
+    assert.ok(policyForDirtyUndo && policyForDirtyUndo.status === 'update');
+    const projectDocument = await vscode.workspace.openTextDocument(projectUri);
+    const cleanProjectOnDisk = await readFile(projectUri.fsPath, 'utf8');
+    const projectEditor = await vscode.window.showTextDocument(projectDocument);
+    const dirtyMarker = '  <!-- unsaved project edit -->\r\n';
+    assert.equal(await projectEditor.edit((edit) => edit.insert(new vscode.Position(1, 0), dirtyMarker)), true);
+    await workbench.refresh(true);
+    state = workbench.getState();
+    const refreshedPolicy = state.rows.find((row: { packageId: string }) => row.packageId === 'Policy.Package');
+    assert.ok(refreshedPolicy && refreshedPolicy.status === 'update');
+    await workbench.review([refreshedPolicy.key]);
+    await workbench.apply();
+    projectText = projectDocument.getText();
+    assert.match(versionLine(projectText, 'Policy.Package') ?? '', /Version="2\.0\.0"/);
+    assert.match(projectText, /<!-- unsaved project edit -->\r\n/);
+    assert.equal(projectDocument.isDirty, true);
+    assert.equal(await readFile(projectUri.fsPath, 'utf8'), cleanProjectOnDisk);
+    const expectedDirtyUndo = projectText.replace(
+      'PackageReference Include="Policy.Package" Version="2.0.0"',
+      'PackageReference Include="Policy.Package" Version="1.0.0"',
     );
+    const focusedProjectEditor = await vscode.window.showTextDocument(projectUri, { preview: false });
+    await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+    const dirtyUndoEvent = waitForDocumentText(projectUri, expectedDirtyUndo);
+    await vscode.commands.executeCommand('undo');
+    projectText = (await dirtyUndoEvent).getText();
+    assert.equal(projectText, expectedDirtyUndo, 'one undo must restore the selected version in an unsaved file');
+    assert.match(projectText, /<!-- unsaved project edit -->\r\n/);
+    assert.equal(projectDocument.isDirty, true, 'undo must retain the unrelated unsaved edit');
+    assert.equal(await readFile(projectUri.fsPath, 'utf8'), cleanProjectOnDisk);
 
     await workbench.refresh(true);
     state = workbench.getState();
@@ -246,9 +274,8 @@ export async function run(): Promise<void> {
     );
     await workbench.review([staleCentral.key, staleRegular.key]);
 
-    const projectDocument = await vscode.workspace.openTextDocument(projectUri);
     const versionOffset = projectDocument.getText().indexOf('Version="1.0.0"') + 'Version="'.length;
-    const editor = await vscode.window.showTextDocument(projectDocument);
+    const editor = focusedProjectEditor;
     await editor.edit((edit) =>
       edit.replace(
         new vscode.Range(projectDocument.positionAt(versionOffset), projectDocument.positionAt(versionOffset + 5)),
@@ -285,6 +312,35 @@ export async function run(): Promise<void> {
       'the concurrent editor change must be retained',
     );
     assert.equal(projectDocument.isDirty, true, 'the extension must not save a concurrent unsaved edit');
+
+    await workbench.refresh(true);
+    state = workbench.getState();
+    const finalCentral = state.rows.find((row: { packageId: string }) => row.packageId === 'Central.Package');
+    assert.ok(finalCentral && finalCentral.status === 'update');
+    await workbench.review([finalCentral.key]);
+    assert.equal(workbench.getState().plan.length, 1);
+    const malformedDocument = await vscode.workspace.openTextDocument(malformedUri);
+    const malformedEditor = await vscode.window.showTextDocument(malformedDocument);
+    const repeatedReview = workbench.review([finalCentral.key]);
+    assert.equal(workbench.getState().plan, undefined, 'starting a second review must clear the earlier plan');
+    const editMalformedFile = malformedEditor.edit((edit) => edit.insert(new vscode.Position(0, 0), ' '));
+    const [reviewResult, editResult] = await Promise.allSettled([repeatedReview, editMalformedFile]);
+    assert.equal(editResult.status, 'fulfilled', 'the nonselected malformed document edit must complete');
+    if (reviewResult.status === 'rejected') {
+      assert.match(String(reviewResult.reason), /changed after discovery|changed during review/i);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const invalidatedCentral = workbench.getState().rows.find((row: { key: string }) => row.key === finalCentral.key);
+    assert.equal(invalidatedCentral.status, 'unchecked');
+    assert.deepEqual(invalidatedCentral.versions, []);
+    assert.equal(workbench.getState().plan, undefined, 'the nonselected document event must invalidate every review');
+    await workbench.apply();
+    centralText = (await vscode.workspace.openTextDocument(centralUri)).getText();
+    assert.match(
+      versionLine(centralText, 'Central.Package') ?? '',
+      /Version="1\.0\.0"/,
+      'a changed nonselected malformed project must leave the selected file untouched',
+    );
     console.log('VS Code host integration passed: shared engine, family review, snapshots, edits and undo.');
   } finally {
     await feed.close();
