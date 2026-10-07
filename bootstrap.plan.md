@@ -1,0 +1,25 @@
+# Bootstrap delivery plan
+
+Scope expansion before initial release: implement [ADR-0002](docs/ADR/ADR-0002-shared-dotnet-engine.md). The user approved `nuget-manager` as both package ID and CLI command. TASK-005 .NET engine/console worker, TASK-006 lead VS Code adapter/family UI, TASK-007 verification/CI worker, TASK-008 docs worker and TASK-009 independent final review have disjoint ownership in that ADR. Default families match the original first-segment rule and support optional dotted subfamilies. Actual NuGet publication/install is a required delivery gate; missing repository publishing credentials must be reported precisely.
+
+Inputs: [brainstorm](bootstrap.brainstorm.md), [acceptance](bootstrap.acceptance.md), [feature](docs/Features/PackageUpdates.md), [ADR](docs/ADR/0001-native-workbench.md).
+
+- [x] Discover source idea, user scope, GitHub account and MCAF policies. Initial scratch tests: 18 passing; original tsx CLI needed a sandbox IPC permission, fixed by the Node import entry point.
+- [x] TASK-001 (lead): establish PackageUpdates slice, apply safety fixes and listed-version metadata checks; AC-001/002/003/005/007. Own production code, manifests, shared contracts, governance and integration. Shared-engine implementation completed in TASK-005/006.
+- [x] TASK-002 (bounded coding worker): real HTTP and VS Code host integration, preview tool and cross-platform CI/release; AC-003/004/005/006. Own tests, scripts/test-host.mjs, scripts/preview.mjs and .github only. Final shared-engine verification completed in TASK-007.
+- [x] TASK-003 (bounded documentation worker): README, development/testing/operations and contribution documents; AC-006/007. Command/path references verified. Final shared-engine documentation completed in TASK-008.
+- [x] TASK-004 (independent read-only review): correctness, snapshot safety, listed metadata, CSP, UI contracts. Final cross-review completed in TASK-009; findings joined into lead fixes.
+- [x] Lead joins every explicit complete result and inspects diffs. Local integrated formatting/typecheck/tests/build, actual VS Code 1.100 host tests, browser flow, VSIX inspection and clean-cache packed-tool installation passed. Hosted CI remains a separate delivery gate below.
+- [ ] Create named managedcode repository, clone to Developer, commit scoped first release and push. Package release via GitHub workflow; verify downloadable VSIX. Marketplace publication is a separate credential-dependent action.
+
+Model routing: strongest suitable lead owns architecture/integration; capable economical worker owns disjoint test/tooling scope; lowest-cost capable worker owns bounded docs; independent reviewer returns reproducible evidence. Native collaboration status/wait controls govern join; idle or incomplete reports never unblock delivery.
+
+Final validation skills: mcaf-solution-governance (root policy and slice map), mcaf-feature-spec (traceability), Playwright (visual interactions). Formatting and static checks are explicit npm gates. Final shared .NET production code uses SDK compiler/analyzers and dotnet format; no extra analyzer package is needed for the initial slice.
+
+Known failing tests: none at scratch baseline. Record later failures with root cause and resolution here. No coverage claim until actual report exists; initial webview render/layout proof uses browser evidence plus independent review rather than a synthetic percentage.
+
+Integration evidence before delivery: TASK-005 shared engine/CLI complete (12 .NET regressions, listed live nuget.org smoke, local tool install); TASK-006 editor adapter and Managed Code themed compact UI complete; TASK-007 process-backed Node suite 22 passing; TASK-008 docs complete; TASK-009 independent cross-review joined snapshot, repeated-review, family-case, initial-scan and publication-state fixes. Both the installed VS Code and minimum version 1.100 passed the final queued-refresh, family-review, repeated-review and malformed unselected-file invalidation regressions. Integrated `npm run check` passed in the Developer checkout: published engine, 22 bridge tests, 12 .NET tests, TypeScript and both format checks. Hosted CI/release remain pending. Adapter coverage measured 91.59% lines; this is not .NET algorithm or UI coverage.
+
+Integration failure resolved: the first Developer typecheck found two obsolete TypeScript engine files left by an earlier copy. Removed only those superseded files, preserving the single shared .NET implementation; the complete integrated check then passed.
+
+Browser evidence: dark/light rendering; 960px three adjacent panes, no horizontal overflow, visible action footer; 720px inspector drawer; Microsoft.Orleans bulk review includes all three rows even with Hosting filter, excluding Microsoft.OrleansExtra. Preview bridge is explicitly illustrative and does not prove editor writes.

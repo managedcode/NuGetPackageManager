@@ -1,0 +1,138 @@
+{
+  "name": "nuget-package-manager",
+  "displayName": "NuGet Package Manager",
+  "description": "Review and update NuGet dependencies by package family, version scope, and declaration file.",
+  "version": "0.1.0",
+  "publisher": "managedcode",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=22"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "nuget",
+    "dotnet",
+    "packages",
+    "dependencies",
+    "central package management"
+  ],
+  "main": "./dist/extension.js",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/managedcode/NuGetPackageManager.git"
+  },
+  "homepage": "https://github.com/managedcode/NuGetPackageManager#readme",
+  "bugs": {
+    "url": "https://github.com/managedcode/NuGetPackageManager/issues"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onCommand:nugetPackageManager.open"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Package declarations can be inspected; applying updates requires workspace trust.",
+      "restrictedConfigurations": [
+        "nugetPackageManager.feeds"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "This extension updates local or remote file-backed .NET workspaces."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "nugetPackageManager.open",
+        "title": "Open Package Workbench",
+        "category": "NuGet",
+        "icon": "$(package)"
+      },
+      {
+        "command": "nugetPackageManager.refresh",
+        "title": "Refresh Package Declarations",
+        "category": "NuGet"
+      },
+      {
+        "command": "nugetPackageManager.checkUpdates",
+        "title": "Check for Package Updates",
+        "category": "NuGet"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "nugetPackageManager.open",
+          "when": "resourceFilename == Directory.Packages.props || resourceExtname == .csproj || resourceExtname == .fsproj || resourceExtname == .vbproj",
+          "group": "nuget@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "NuGet Package Manager",
+      "properties": {
+        "nugetPackageManager.feeds": {
+          "type": "array",
+          "default": [
+            {
+              "name": "nuget.org",
+              "url": "https://api.nuget.org/v3/index.json"
+            }
+          ],
+          "description": "NuGet V3 service indexes used to check versions. HTTPS and local HTTP feeds are supported. Authenticated feeds and NuGet.config source mapping are not supported yet. Do not include credentials.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "url"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test.mjs",
+    "test:host": "node scripts/test-host.mjs",
+    "check": "npm run typecheck && npm run build && npm test && dotnet test NuGetPackageManager.slnx -c Release && npm run format:check && dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore",
+    "package": "vsce package --no-dependencies --out artifacts/",
+    "vscode:prepublish": "npm run build",
+    "preview": "node scripts/preview.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "coverage": "node scripts/test.mjs --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.100.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.25.0",
+    "prettier": "3.9.9",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

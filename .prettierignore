@@ -1,0 +1,12 @@
+node_modules
+dist
+artifacts
+.vscode-test
+output
+.playwright-cli
+.preview
+.codex/skills
+package-lock.json
+media/icon.png
+dotnet
+NuGetPackageManager.slnx

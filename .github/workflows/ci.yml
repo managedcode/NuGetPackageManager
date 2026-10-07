@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: dotnet restore NuGetPackageManager.slnx
+      - run: dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore
+      - run: dotnet test NuGetPackageManager.slnx --configuration Release --no-restore
+      - name: Pack global tool
+        run: dotnet pack dotnet/ManagedCode.NuGet.Tool/ManagedCode.NuGet.Tool.csproj --configuration Release --output artifacts
+      - name: Smoke install global tool
+        shell: bash
+        run: |
+          dotnet tool install --tool-path "$RUNNER_TEMP/tools" --add-source artifacts nuget-manager --version 0.1.0
+          "$RUNNER_TEMP/tools/nuget-manager" --help
+        if: runner.os != 'Windows'
+      - name: Smoke install global tool on Windows
+        shell: pwsh
+        run: |
+          $toolPath = Join-Path $env:RUNNER_TEMP 'tools'
+          dotnet tool install --tool-path $toolPath --add-source artifacts nuget-manager --version 0.1.0
+          & (Join-Path $toolPath 'nuget-manager.exe') --help
+        if: runner.os == 'Windows'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run format:check
+      - run: npm run package
+      - name: VS Code host integration tests
+        run: xvfb-run -a npm run test:host
+        if: runner.os == 'Linux'
+      - name: VS Code host integration tests
+        run: npm run test:host
+        if: runner.os != 'Linux'

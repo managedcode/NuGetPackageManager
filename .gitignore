@@ -1,0 +1,13 @@
+node_modules/
+dist/
+artifacts/
+.vscode-test/
+output/
+.playwright-cli/
+.preview/
+*.vsix
+.DS_Store
+*.log
+**/bin/
+**/obj/
+TestResults/

@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-package:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: dotnet restore NuGetPackageManager.slnx
+      - run: dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore
+      - run: dotnet test NuGetPackageManager.slnx --configuration Release --no-restore
+      - name: Pack global tool
+        run: dotnet pack dotnet/ManagedCode.NuGet.Tool/ManagedCode.NuGet.Tool.csproj --configuration Release --output artifacts
+      - name: Smoke install global tool
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          dotnet tool install --tool-path "$RUNNER_TEMP/tools" --add-source artifacts nuget-manager --version "$VERSION"
+          "$RUNNER_TEMP/tools/nuget-manager" --help
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run format:check
+      - run: npm run package
+      - name: VS Code host integration tests
+        run: xvfb-run -a npm run test:host
+      - name: Match tag to both package versions
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TOOL_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' dotnet/ManagedCode.NuGet.Tool/ManagedCode.NuGet.Tool.csproj | head -n 1)
+          test "$VERSION" = "$TOOL_VERSION"
+          test "$GITHUB_REF_NAME" = "v$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: |
+            artifacts/*.vsix
+            artifacts/*.nupkg
+          if-no-files-found: error
+
+  github-release:
+    needs: [verify-and-package, nuget-publish]
+    if: always() && needs.verify-and-package.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: artifacts
+      - name: Publish GitHub release with VSIX and global tool package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUGET_STATUS: ${{ needs.nuget-publish.result }}
+        shell: bash
+        run: |
+          if [[ "$NUGET_STATUS" == "success" ]]; then
+            PRERELEASE=false
+            echo 'NuGet Package Manager for VS Code and the nuget-manager global tool share one .NET engine. The tool is published on NuGet.org: dotnet tool install --global nuget-manager. Both hosts support reviewed updates of complete package families.' > "$RUNNER_TEMP/release-notes.md"
+          else
+            PRERELEASE=true
+            echo 'Preview artifacts: install the VSIX manually, or install the downloaded nupkg from a local source. Publishing nuget-manager on NuGet.org is pending; check the NuGet publish job. This preview does not confirm public NuGet availability.' > "$RUNNER_TEMP/release-notes.md"
+          fi
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" artifacts/*.vsix artifacts/*.nupkg --clobber
+            gh release edit "$GITHUB_REF_NAME" --prerelease="$PRERELEASE" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$GITHUB_REF_NAME" artifacts/*.vsix artifacts/*.nupkg --title "$GITHUB_REF_NAME" --prerelease="$PRERELEASE" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+
+  nuget-publish:
+    needs: verify-and-package
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: artifacts
+      - name: Publish .NET global tool to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "$NUGET_API_KEY" ]]; then
+            echo "NUGET_API_KEY is required to publish nuget-manager to NuGet.org." >&2
+            exit 1
+          fi
+          dotnet nuget push artifacts/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Verify public NuGet availability and install
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          VERSION_LOWER=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
+          PACKAGE_URL="https://api.nuget.org/v3-flatcontainer/nuget-manager/$VERSION_LOWER/nuget-manager.nuspec"
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent --show-error "$PACKAGE_URL" -o /dev/null; then
+              break
+            fi
+            if [[ "$attempt" == 20 ]]; then
+              echo "nuget-manager $VERSION did not become available on NuGet.org within 10 minutes." >&2
+              exit 1
+            fi
+            sleep 30
+          done
+          dotnet tool install --tool-path "$RUNNER_TEMP/published-tools" nuget-manager --version "$VERSION" --add-source https://api.nuget.org/v3/index.json
+          "$RUNNER_TEMP/published-tools/nuget-manager" --help

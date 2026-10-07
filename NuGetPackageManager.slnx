@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="dotnet/ManagedCode.NuGet.Core/ManagedCode.NuGet.Core.csproj" />
+  <Project Path="dotnet/ManagedCode.NuGet.Tool/ManagedCode.NuGet.Tool.csproj" />
+  <Project Path="dotnet/ManagedCode.NuGet.Tests/ManagedCode.NuGet.Tests.csproj" />
+</Solution>

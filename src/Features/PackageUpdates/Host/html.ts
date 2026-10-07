@@ -1,0 +1,10 @@
+import * as vscode from 'vscode';
+import { randomBytes } from 'node:crypto';
+
+export function getHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+  const nonce = randomBytes(24).toString('base64');
+  const media = vscode.Uri.joinPath(extensionUri, 'media', 'Features', 'PackageUpdates');
+  const style = webview.asWebviewUri(vscode.Uri.joinPath(media, 'style.css'));
+  const script = webview.asWebviewUri(vscode.Uri.joinPath(media, 'app.js'));
+  return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data:;"><title>NuGet Package Manager</title><link rel="stylesheet" href="${style}"></head><body><div id="app"></div><script nonce="${nonce}" src="${script}"></script></body></html>`;
+}
