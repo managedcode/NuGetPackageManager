@@ -17,6 +17,8 @@ Use [MCAF](https://mcaf.managed-code.com/tutorial). Start from [docs/Architectur
 - Format: `npm run format`; verify: `npm run format:check`.
 - Core coverage: `npm run coverage`.
 - Package: `npm run package`.
+- Version: `npm run version:bump -- patch|minor|major|X.Y.Z`; verify synchronized versions: `npm run version:check`.
+- Release helper regressions: `npm run test:release`.
 - UI preview: `npm run preview`; this supplements actual host tests.
 
 ## Architecture and boundaries
@@ -56,3 +58,9 @@ Durable user corrections and repeated mistakes become precise repository rules a
 - `function_max_loc`: 100, excluding declarative UI templates.
 - `max_nesting_depth`: 4.
 - `exception_policy`: justify exceptions in the nearest ADR with scope, reason and split/removal trigger. ADR 0001 documents the cohesive initial host/UI template exception.
+
+## Release identity and automation
+
+The Marketplace technical name is managedcode-nuget-package-manager; displayName remains NuGet Package Manager and publisher managedcode. The original short name is already reserved on Marketplace. Update all version files with the canonical helper, never move release tags, and do not rely on GITHUB_TOKEN tag push to trigger another workflow: explicitly dispatch Release after successful main matrix checks. Publish the exact GitHub VSIX artifact. Marketplace credentials belong to the marketplace environment and automatic publication is opt-in through MARKETPLACE_PUBLISH=true. A missing publisher identity is pending configuration, never evidence of publication.
+
+Version increments require an explicit human release decision. Preserve 0.1.1 for the current badge/workflow and first Marketplace identity correction; do not create or publish a new NuGet version to test automation.

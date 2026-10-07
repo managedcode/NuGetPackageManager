@@ -1,0 +1,11 @@
+# Release automation acceptance
+
+Owner: lead. Operational obligations and [ADR-0003](docs/ADR/ADR-0003-versioned-publishing.md) define this cross-cutting change.
+
+- OP-REL-001 / AC-REL-001: README exposes linked CI, release, NuGet version/download, license and supported runtime badges from real providers. VSIX packaging accepts the badges.
+- OP-REL-002 / AC-REL-002: one stable version bump updates extension, root lock metadata and .NET tool consistently. Reject malformed/downgraded versions and existing drift before writes; a check mode is read-only. Tests use real temporary files.
+- OP-REL-003 / AC-REL-003: only a successful main three-OS CI may automatically create a new immutable matching version tag and explicitly dispatch Release. PRs never write tags or publish. Existing historical tags are preserved; unchanged versions do not create another release.
+- OP-REL-004 / AC-REL-004: Release publishes version-matched VSIX/NuGet artifacts, verifies public tool installation/live feed, and exposes manual dispatch for recovery. Validate the existing-version skip with 0.1.1 in hosted CI. The user explicitly keeps the current version: a new version/tag/public NuGet release is not authorized for this configuration-only change. New-tag dispatch is syntax/review verified until the user chooses a future version.
+- OP-REL-005 / AC-REL-005: Marketplace accepts a verified public release tag, validates VSIX identity/version, publishes that exact asset and verifies the gallery version. OIDC or PAT comes only from configured credentials. Missing authentication must produce a clear error on an explicitly requested publishing run. Automatic publishing requires MARKETPLACE_PUBLISH=true. Credential absence is a delivery limitation, never a publication claim.
+
+Validation: version tests, Prettier, actionlint, packaging, independent review, hosted main CI/autotag/Release and fresh NuGet install. Actual Marketplace publishing/verification requires the managedcode publisher identity and remains pending until connected.

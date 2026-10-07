@@ -3,9 +3,14 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   verify-and-package:
@@ -22,6 +27,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Validate tagged versions before packaging
+        shell: bash
+        run: |
+          VERSION=$(node scripts/release-version.mjs --check)
+          test "$GITHUB_REF_NAME" = "v$VERSION"
+      - run: npm run test:release
       - run: dotnet restore NuGetPackageManager.slnx
       - run: dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore
       - run: dotnet test NuGetPackageManager.slnx --configuration Release --no-restore
@@ -31,7 +42,7 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          dotnet tool install --tool-path "$RUNNER_TEMP/tools" --add-source artifacts nuget-manager --version "$VERSION"
+          dotnet tool install --tool-path "$RUNNER_TEMP/tools" --source artifacts nuget-manager --version "$VERSION"
           "$RUNNER_TEMP/tools/nuget-manager" --help
           node scripts/verify-live-feed.mjs "$RUNNER_TEMP/tools/nuget-manager"
       - run: npm ci
@@ -136,3 +147,14 @@ jobs:
           done
           "$RUNNER_TEMP/published-tools/nuget-manager" --help
           node scripts/verify-live-feed.mjs "$RUNNER_TEMP/published-tools/nuget-manager"
+
+  marketplace-publish:
+    needs: [github-release, nuget-publish]
+    if: vars.MARKETPLACE_PUBLISH == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/marketplace.yml
+    with:
+      release_tag: ${{ github.ref_name }}
+    secrets: inherit

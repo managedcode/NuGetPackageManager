@@ -25,3 +25,5 @@ dist/*.map
 .vscodeignore
 
 **/*.pdb
+
+release-automation.*.md

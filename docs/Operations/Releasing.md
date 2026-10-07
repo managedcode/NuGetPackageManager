@@ -1,31 +1,51 @@
 # Release operations
 
-The intended release contains a VS Code `.vsix` and a `nuget-manager` global tool package. A tagged build or local package is not a completed release: verify the GitHub asset and the package's availability on the intended NuGet feed, then install the tool from that feed.
+The release flow versions the VS Code extension and `nuget-manager` tool together, verifies a successful main-branch build, publishes a version-tagged GitHub release, and can then publish the exact released VSIX to the VS Code Marketplace. NuGet and GitHub release success do not imply Marketplace publication. The technical extension name is `managedcode-nuget-package-manager`, its VS Code ID is `managedcode.managedcode-nuget-package-manager`, and its display name remains **NuGet Package Manager**. Marketplace credentials are not yet verified; automatic publication, including the first publication, can be enabled after the publisher identity is connected and verified once.
 
-## Prepare
+## Version and GitHub release
 
-1. Update the VS Code extension version and .NET tool package version consistently, then add the release notes to `CHANGELOG.md`.
-2. Run all checks in [Testing](../Testing/Testing.md), including the .NET Release build/tests, VS Code host tests, and VSIX packaging.
-3. Merge reviewed changes to the main branch.
-4. Push a tag matching the package version, such as `v0.1.1` for version `0.1.1`.
-
-The release workflow checks .NET and extension builds/tests, formatting, host integration and packaging, and verifies that the tag matches both package versions. It creates the VSIX and NuGet package. NuGet publishing requires `NUGET_API_KEY` accessible to the `release` environment. If the key is absent or publication fails, the NuGet job fails clearly and the release is incomplete. GitHub still receives an explicitly marked preview release with both artifacts; a successful public-feed install promotes the release to normal status. Do not add the key to repository files, logs, or local documentation examples. After repairing a publication failure, rerun the failed workflow jobs; existing release assets and notes are updated by the workflow.
-
-## NuGet feed verification gate
-
-Version 0.1.1 fixes a release-blocking defect where compressed NuGet V3 registration responses could reach JSON parsing without being decoded. A green local-feed regression test alone is insufficient: the candidate must be available from the public NuGet feed, install successfully as a complete tool package, and pass a real read-only feed check.
-
-After publication, install the exact candidate version and check a package family against nuget.org:
+Version changes are explicit release decisions made by a human. Do not bump versions for ordinary commits or badge, workflow, and configuration changes. The current published version remains 0.1.1. Use the helper only after a release owner chooses a new version, to update the extension manifest, root lockfile metadata, and .NET tool project together:
 
 ```sh
-dotnet tool install --global nuget-manager --version 0.1.1
-nuget-manager check --family Microsoft.Orleans
+npm run version:bump -- patch
 ```
 
-NuGet may take time to index a newly published version. If installation reports that the version cannot be found while indexing is still in progress, wait and retry the entire `dotnet tool install` command; do not treat a partial or cached install as proof. Run the CLI check only after the full install succeeds. The check must fetch and parse live feed metadata successfully, not merely print help or report an empty result. If install or live check fails, leave the release marked preview/pending and continue diagnosis; do not announce 0.1.1 as delivered.
+Run a bump only as part of an explicitly chosen release. The other supported arguments are `minor`, `major`, or the exact stable version selected by the human release owner. Review and commit `package.json`, `package-lock.json`, and `dotnet/ManagedCode.NuGet.Tool/ManagedCode.NuGet.Tool.csproj` together with the release changes. Do not edit or move an existing release tag.
 
-After the gate passes, verify the `.vsix` is attached to the [GitHub Release](https://github.com/managedcode/NuGetPackageManager/releases), confirm the NuGet package version, and record the release tag, workflow run, GitHub VSIX asset, install result, and live-feed check in release evidence. No Marketplace publication is configured or implied.
+The main three-OS CI preserves historical tags and skips release creation when the current version already has a tag. After a human-approved new version reaches `main`, CI verifies it and creates the matching immutable `vX.Y.Z` tag. A tag push made with `GITHUB_TOKEN` does not trigger another `push` workflow, so CI explicitly dispatches the `Release` workflow at that tag. Release can also be dispatched manually for recovery, using the existing tag rather than rebuilding from `main`.
+
+Release builds and validates the version-matched VSIX and NuGet tool package, then runs the public NuGet installation and live-feed checks. If publishing or verification fails, the GitHub release remains marked preview/pending; fix the cause and rerun the failed workflow jobs. Do not describe the version as delivered until the VSIX is attached and a fresh public NuGet install plus live feed check succeeds.
+
+### Current 0.1.1 extension identity repair
+
+The extension technical name changed to `managedcode-nuget-package-manager` to resolve a Marketplace name collision. This is a one-time VSIX identity repair at unchanged version 0.1.1. Use `managedcode-nuget-package-manager-0.1.1.vsix`, qualify it from its producing commit, and upload that artifact to the existing GitHub `v0.1.1` release with the producing commit recorded. Preserve the existing `v0.1.1` tag and `nuget-manager` CLI package; do not create a new version or tag for this repair.
+
+## Marketplace publishing
+
+The reusable/manual workflow is `.github/workflows/marketplace.yml`. It takes a `release_tag`, downloads the VSIX from that exact public GitHub release, checks the embedded publisher, extension ID, and version, and publishes that verified file. The current identity-repair artifact is `managedcode-nuget-package-manager-0.1.1.vsix`. For future human-approved versions, the filename follows `managedcode-nuget-package-manager-X.Y.Z.vsix`. It must not rebuild a different VSIX. The workflow status badge in the README reports automation status only; it does not assert that a Marketplace listing exists.
+
+Automatic publishing is opt-in. Set the repository variable `MARKETPLACE_PUBLISH=true` after the publisher identity has been connected once and the workflow configuration is ready. This supports automatic publication on the first listing as well as later releases. Without it, the release is not automatically published to the Marketplace. A manual `workflow_dispatch` with `release_tag` remains available for explicit publication and recovery.
+
+### Preferred authentication: Microsoft Entra workload identity
+
+Configure an Entra application/service principal and GitHub Actions OIDC federation for the protected `marketplace` environment:
+
+- Repository variables: `MARKETPLACE_AZURE_CLIENT_ID` and `MARKETPLACE_AZURE_TENANT_ID`.
+- Federated credential issuer: `https://token.actions.githubusercontent.com`.
+- Audience: `api://AzureADTokenExchange`.
+- Subject: `repo:managedcode/NuGetPackageManager:environment:marketplace`.
+- Add the identity as a Contributor to the `managedcode` publisher in the Visual Studio Marketplace management portal. Use the identity's Azure DevOps profile identity ID for the publisher permission; this is different from the Entra application/client ID.
+
+The workflow uses the official [`azure/login` action](https://github.com/Azure/login/releases/tag/v3.1.0), pinned to v3.1.0, with OIDC. Follow Microsoft's [VS Code extension publishing guide](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) for publisher management. Never put credentials in source, artifacts, or logs. A missing or invalid identity must make an explicitly requested publish fail clearly; it must never count as a successful Marketplace release.
+
+### Transitional PAT authentication
+
+If workload identity is not yet available, a `VSCE_PAT` with the Marketplace **Manage** permission can be used as a protected secret for the `marketplace` environment. Prefer OIDC for new setup. Microsoft retires existing global Azure DevOps PATs on December 1, 2026 ([official retirement notice](https://learn.microsoft.com/en-us/azure/devops/release-notes/2026/general/sprint-270-update)); plan to move off PAT-based publishing before that date. Do not request or paste tokens into chat or repository files.
+
+### Optional manual first publication
+
+If preferred, the first release can instead be published through the Visual Studio Marketplace management UI: choose **New extension → Visual Studio Code** and upload the already verified VSIX from the GitHub release. This is optional; once the publisher identity is connected, the Marketplace workflow can create the first listing automatically. Confirm the publisher, extension ID, and version in the gallery before claiming publication. No Marketplace listing or publication is claimed until that verification is complete.
 
 ## Rollback
 
-Use GitHub release controls to stop distributing a faulty VSIX and publish a corrected version through a new tag. Follow NuGet's package deprecation/unlisting process if a published tool package is defective; package versions cannot be overwritten. Users can uninstall either delivery. Applied declaration edits are ordinary workspace changes and can be undone in VS Code or reverted through source control. There is no remote application state or migration.
+Disable automatic publication by setting `MARKETPLACE_PUBLISH` to `false` or removing it. Existing versions and tags remain immutable; corrections use a new version. Use GitHub release controls to stop distributing a faulty VSIX, and follow NuGet's package deprecation/unlisting process for a defective tool package. Marketplace versions cannot be overwritten; follow Marketplace unpublish/deprecation controls and publish a corrected version. Users can uninstall either delivery. Package updates already applied to a workspace can be undone in VS Code or reverted through source control.

@@ -509,7 +509,10 @@ export class Workbench implements vscode.Disposable {
         break;
       }
       case 'settings':
-        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:managedcode.nuget-package-manager');
+        await vscode.commands.executeCommand(
+          'workbench.action.openSettings',
+          '@ext:managedcode.managedcode-nuget-package-manager',
+        );
         break;
     }
   }

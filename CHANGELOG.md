@@ -4,6 +4,9 @@ Changes are recorded here for each verified release.
 
 ## 0.1.1
 
+- Use the unique Marketplace technical name `managedcode-nuget-package-manager` while retaining the display name.
+- Add GitHub badges and explicit version-driven release/Marketplace automation; the current version remains 0.1.1.
+
 - Decode compressed NuGet V3 responses in the shared engine used by both hosts.
 - Retry public tool installation while NuGet metadata is being indexed and verify a read-only live-feed check before completing a release.
 

@@ -11,3 +11,6 @@ output/
 **/bin/
 **/obj/
 TestResults/
+
+.release-version.lock
+*.release-version-*.tmp

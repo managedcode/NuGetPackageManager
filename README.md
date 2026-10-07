@@ -1,5 +1,14 @@
 # NuGet Package Manager
 
+[![CI](https://img.shields.io/github/actions/workflow/status/managedcode/NuGetPackageManager/ci.yml?branch=main&label=CI)](https://github.com/managedcode/NuGetPackageManager/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/actions/workflow/status/managedcode/NuGetPackageManager/release.yml?label=Release)](https://github.com/managedcode/NuGetPackageManager/actions/workflows/release.yml)
+[![NuGet version](https://img.shields.io/nuget/v/nuget-manager.svg)](https://www.nuget.org/packages/nuget-manager)
+[![NuGet downloads](https://img.shields.io/nuget/dt/nuget-manager.svg)](https://www.nuget.org/packages/nuget-manager)
+[![License](https://img.shields.io/github/license/managedcode/NuGetPackageManager.svg)](LICENSE)
+[![VS Code 1.100+](https://img.shields.io/badge/VS%20Code-%E2%89%A51.100-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/updates/v1_100)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/10.0)
+[![Marketplace workflow](https://img.shields.io/github/actions/workflow/status/managedcode/NuGetPackageManager/marketplace.yml?branch=main&label=Marketplace%20workflow)](https://github.com/managedcode/NuGetPackageManager/actions/workflows/marketplace.yml)
+
 Review NuGet updates across a .NET workspace before changing declarations. Select a package family, inspect every proposed version, and review the complete change set before applying it. The same .NET 10 engine powers the VS Code workbench and the `nuget-manager` command-line tool.
 
 ![NuGet Package Manager workbench](https://raw.githubusercontent.com/managedcode/NuGetPackageManager/main/media/screenshots/workbench.png)
@@ -12,7 +21,7 @@ Families use the first package ID segment by default. You can select a narrower 
 
 Choose the `latest`, `minor`, or `patch` policy. Stable releases are the default; prereleases are optional. Updates require a trusted workspace. The extension applies version text through VS Code documents, preserving surrounding formatting. Files that were clean are saved; files that already had unsaved edits remain unsaved. A changed document invalidates the full review before edits are applied. Changing a central version affects all projects that consume it.
 
-Install a released `.vsix` from [GitHub Releases](https://github.com/managedcode/NuGetPackageManager/releases) using **Extensions → … → Install from VSIX…**. Release notes distinguish preview artifacts from verified public NuGet publication.
+The VS Code display name is **NuGet Package Manager** and the extension ID is `managedcode.managedcode-nuget-package-manager`. Install a released `.vsix` from [GitHub Releases](https://github.com/managedcode/NuGetPackageManager/releases) using **Extensions → … → Install from VSIX…**. Release notes distinguish preview artifacts from verified public NuGet publication.
 
 The extension supports VS Code 1.100 or later and requires the .NET 10 runtime to run its bundled engine. Install the runtime using Microsoft's [.NET download instructions](https://dotnet.microsoft.com/download/dotnet/10.0). No Node.js installation is needed to use the extension.
 

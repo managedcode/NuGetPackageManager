@@ -1,0 +1,119 @@
+name: Marketplace
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Verified public GitHub release tag, for example v0.1.1
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketplace-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: marketplace
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate the public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'A stable vX.Y.Z release tag is required.' >&2
+            exit 1
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease > "$RUNNER_TEMP/release.json"
+          node -e 'const r=require(process.env.RUNNER_TEMP+"/release.json"); if(r.tagName!==process.env.RELEASE_TAG||r.isDraft||r.isPrerelease) throw Error("Only a verified public stable release can be published");'
+      - name: Require publisher authentication
+        id: auth
+        env:
+          CLIENT_ID: ${{ vars.MARKETPLACE_AZURE_CLIENT_ID }}
+          TENANT_ID: ${{ vars.MARKETPLACE_AZURE_TENANT_ID }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        shell: bash
+        run: |
+          if [[ -n "$CLIENT_ID" || -n "$TENANT_ID" ]]; then
+            if [[ -z "$CLIENT_ID" || -z "$TENANT_ID" ]]; then
+              echo 'Set both MARKETPLACE_AZURE_CLIENT_ID and MARKETPLACE_AZURE_TENANT_ID.' >&2
+              exit 1
+            fi
+            echo 'mode=oidc' >> "$GITHUB_OUTPUT"
+          elif [[ -n "$VSCE_PAT" ]]; then
+            echo 'mode=pat' >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::Marketplace publisher authentication is missing. Configure Entra/OIDC variables or the VSCE_PAT secret. See docs/Operations/Releasing.md.'
+            echo 'Marketplace publication is pending publisher authentication; GitHub/NuGet assets remain available.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Download and validate the exact released VSIX
+        id: asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          VSIX="artifacts/managedcode-nuget-package-manager-$VERSION.vsix"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "managedcode-nuget-package-manager-$VERSION.vsix" --dir artifacts
+          unzip -p "$VSIX" extension/package.json > "$RUNNER_TEMP/vsix-manifest.json"
+          node -e 'const p=require(process.env.RUNNER_TEMP+"/vsix-manifest.json"); if(p.version!==process.env.RELEASE_TAG.slice(1)||p.publisher!=="managedcode"||p.name!=="managedcode-nuget-package-manager") throw Error("Released VSIX identity/version mismatch");'
+          echo "path=$VSIX" >> "$GITHUB_OUTPUT"
+      - run: npm ci --ignore-scripts
+      - name: Sign in with the federated Marketplace identity
+        if: steps.auth.outputs.mode == 'oidc'
+        uses: azure/login@v3.1.0
+        with:
+          client-id: ${{ vars.MARKETPLACE_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.MARKETPLACE_AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Publish the verified VSIX
+        env:
+          AUTH_MODE: ${{ steps.auth.outputs.mode }}
+          VSIX: ${{ steps.asset.outputs.path }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        shell: bash
+        run: |
+          if [[ "$AUTH_MODE" == 'oidc' ]]; then
+            unset VSCE_PAT
+            npx --no-install vsce publish --packagePath "$VSIX" --skip-duplicate --azure-credential
+          else
+            npx --no-install vsce publish --packagePath "$VSIX" --skip-duplicate
+          fi
+      - name: Verify the public Marketplace version
+        shell: bash
+        run: |
+          for attempt in $(seq 1 20); do
+            if npx --no-install vsce show managedcode.managedcode-nuget-package-manager --json > "$RUNNER_TEMP/gallery.json" 2> "$RUNNER_TEMP/gallery-error.txt" && \
+              node -e 'const p=require(process.env.RUNNER_TEMP+"/gallery.json"); if(!p.versions?.some(v=>v.version===process.env.RELEASE_TAG.slice(1))) process.exit(1);'; then
+              echo "Marketplace version ${RELEASE_TAG#v} is publicly available." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if [[ "$attempt" == 20 ]]; then
+              echo 'The published version is not yet visible on Marketplace. Inspect publisher validation status and rerun.' >&2
+              cat "$RUNNER_TEMP/gallery-error.txt" >&2
+              exit 1
+            fi
+            sleep 15
+          done

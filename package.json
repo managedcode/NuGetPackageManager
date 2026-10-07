@@ -1,5 +1,5 @@
 {
-  "name": "nuget-package-manager",
+  "name": "managedcode-nuget-package-manager",
   "displayName": "NuGet Package Manager",
   "description": "Review and update NuGet dependencies by package family, version scope, and declaration file.",
   "version": "0.1.1",
@@ -117,13 +117,16 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.mjs",
     "test:host": "node scripts/test-host.mjs",
-    "check": "npm run typecheck && npm run build && npm test && dotnet test NuGetPackageManager.slnx -c Release && npm run format:check && dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore",
+    "check": "npm run version:check && npm run test:release && npm run typecheck && npm run build && npm test && dotnet test NuGetPackageManager.slnx -c Release && npm run format:check && dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore",
     "package": "vsce package --no-dependencies --out artifacts/",
     "vscode:prepublish": "npm run build",
     "preview": "node scripts/preview.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "coverage": "node scripts/test.mjs --coverage"
+    "coverage": "node scripts/test.mjs --coverage",
+    "version:bump": "node scripts/release-version.mjs",
+    "version:check": "node scripts/release-version.mjs --check",
+    "test:release": "node --test tests/ReleaseAutomation/version.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

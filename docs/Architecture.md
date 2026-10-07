@@ -30,3 +30,5 @@ The VSIX bundles the same framework-dependent engine assembled for the NuGet too
 First-segment families are the default; engine-provided dotted prefixes allow narrower selection. A family update opens one exact review across every affected file. Feed errors remain explicit. The frontend uses VS Code theme variables with Managed Code orange accents, three adjacent panes at normal widths and an inspector drawer at narrow widths.
 
 Read [PackageUpdates](Features/PackageUpdates.md), [ADR-0002](ADR/ADR-0002-shared-dotnet-engine.md) and [acceptance](../bootstrap.acceptance.md) for contracts. [ADR 0001](ADR/0001-native-workbench.md) records the superseded prototype. No server, database or separate product repository is required.
+
+Version-driven release and Marketplace publishing are defined in [ADR-0003](ADR/ADR-0003-versioned-publishing.md) and [release acceptance](../release-automation.acceptance.md). Successful main CI creates an immutable version tag and explicitly dispatches Release. Marketplace publishing consumes the verified GitHub VSIX through a separately authenticated workflow.

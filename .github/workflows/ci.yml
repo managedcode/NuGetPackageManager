@@ -25,6 +25,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - run: npm run version:check
+      - run: npm run test:release
       - run: dotnet restore NuGetPackageManager.slnx
       - run: dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore
       - run: dotnet test NuGetPackageManager.slnx --configuration Release --no-restore
@@ -34,7 +36,7 @@ jobs:
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          dotnet tool install --tool-path "$RUNNER_TEMP/tools" --add-source artifacts nuget-manager --version "$VERSION"
+          dotnet tool install --tool-path "$RUNNER_TEMP/tools" --source artifacts nuget-manager --version "$VERSION"
           "$RUNNER_TEMP/tools/nuget-manager" --help
         if: runner.os != 'Windows'
       - name: Smoke install global tool on Windows
@@ -42,7 +44,7 @@ jobs:
         run: |
           $toolPath = Join-Path $env:RUNNER_TEMP 'tools'
           $version = (Get-Content package.json | ConvertFrom-Json).version
-          dotnet tool install --tool-path $toolPath --add-source artifacts nuget-manager --version $version
+          dotnet tool install --tool-path $toolPath --source artifacts nuget-manager --version $version
           & (Join-Path $toolPath 'nuget-manager.exe') --help
         if: runner.os == 'Windows'
       - run: npm ci
@@ -57,3 +59,51 @@ jobs:
       - name: VS Code host integration tests
         run: npm run test:host
         if: runner.os != 'Linux'
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: verified-vsix
+          path: artifacts/*.vsix
+          if-no-files-found: error
+
+  release-version:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    concurrency:
+      group: versioned-release-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Tag the tested version and explicitly dispatch Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          VERSION=$(node scripts/release-version.mjs --check)
+          TAG="v$VERSION"
+          MAIN_SHA=$(git ls-remote origin refs/heads/main | cut -f 1)
+          if [[ "$MAIN_SHA" != "$GITHUB_SHA" ]]; then
+            echo 'A newer main commit will own the version release.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            TAG_SHA=$(git rev-parse "$TAG^{commit}")
+            if [[ "$TAG_SHA" != "$GITHUB_SHA" ]]; then
+              echo "Version $VERSION is already released; preserving its tag and skipping publication." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          else
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "$TAG"
+          fi
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+          echo "Dispatched Release for $TAG at the tested commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
