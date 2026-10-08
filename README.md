@@ -2,7 +2,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/managedcode/NuGetPackageManager/ci.yml?branch=main&label=CI)](https://github.com/managedcode/NuGetPackageManager/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/actions/workflow/status/managedcode/NuGetPackageManager/release.yml?label=Release)](https://github.com/managedcode/NuGetPackageManager/actions/workflows/release.yml)
-[![Marketplace version](https://img.shields.io/visual-studio-marketplace/v/ManagedCode.managedcode-nuget-package-manager?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=ManagedCode.managedcode-nuget-package-manager)
+[![Marketplace version](https://vsmarketplacebadges.dev/version/ManagedCode.managedcode-nuget-package-manager.svg?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=ManagedCode.managedcode-nuget-package-manager)
 [![NuGet version](https://img.shields.io/nuget/v/nuget-manager.svg)](https://www.nuget.org/packages/nuget-manager)
 [![NuGet downloads](https://img.shields.io/nuget/dt/nuget-manager.svg)](https://www.nuget.org/packages/nuget-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
