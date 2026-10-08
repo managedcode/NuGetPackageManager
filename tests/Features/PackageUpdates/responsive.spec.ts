@@ -110,6 +110,8 @@ async function narrowDetails(page: Page, testInfo: TestInfo) {
   const inspector = page.getByRole('complementary', { name: 'Package details', exact: true });
   const back = inspector.getByRole('button', { name: 'Back to packages', exact: true });
   await expect(back).toBeFocused();
+  // Measure after the real drawer transition, rather than comparing different animation frames.
+  await expect.poll(() => inspector.evaluate((element) => getComputedStyle(element).transform)).toBe('none');
   const current = inspector.locator('.decl-grid .mono');
   await expect(current).toHaveText(currentVersion);
   inside(await bounds(current), await bounds(inspector.locator('.decl-card')), 'long current version');
