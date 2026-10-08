@@ -14,6 +14,38 @@
   const isUpdate = (row) => row.status === 'update';
   const otherKinds = new Set(['revision', 'prerelease']);
 
+  // Search presets translate to the existing host contract; the engine owns version selection.
+  const searchModes = {
+    all: {
+      label: 'All',
+      policy: 'latest',
+      prerelease: true,
+      description: 'All newer listed versions, including prereleases',
+    },
+    stable: {
+      label: 'Stable',
+      policy: 'latest',
+      prerelease: false,
+      description: 'Newer stable listed versions across all version numbers',
+    },
+    minor: {
+      label: 'Minor',
+      policy: 'minor',
+      prerelease: false,
+      description: 'Newer versions within the current first number, including patches',
+    },
+    patch: {
+      label: 'Patch',
+      policy: 'patch',
+      prerelease: false,
+      description: 'Newer versions within the current first and second numbers',
+    },
+  };
+
+  function searchMode(policy, prerelease) {
+    return policy === 'latest' ? (prerelease ? 'all' : 'stable') : policy;
+  }
+
   /** Distinct-package counts; a package counts once per status it has in any declaration. */
   function summarize(rows) {
     const count = (filter) => new Set(rows.filter(filter).map(packageKey)).size;
@@ -217,6 +249,8 @@
   }
 
   return {
+    searchModes,
+    searchMode,
     summarize,
     filterRows,
     buildTree,

@@ -307,8 +307,10 @@
     } else if (data.sub) {
       const keys = keysFor(data.sub);
       select(keys, model.selectionState(keys, ui.selected) !== 'all');
-    } else if (data.policy) send('policy', { policy: data.policy, prerelease: state.prerelease });
-    else if (data.kindOnly) {
+    } else if (data.searchMode) {
+      const mode = model.searchModes[data.searchMode];
+      if (mode) send('policy', { policy: mode.policy, prerelease: mode.prerelease });
+    } else if (data.kindOnly) {
       const only = ui.kinds.size === 1 && ui.kinds.has(data.kindOnly);
       ui.kinds = new Set(only ? [] : [data.kindOnly]);
     } else if (data.kind) toggle(ui.kinds, data.kind);

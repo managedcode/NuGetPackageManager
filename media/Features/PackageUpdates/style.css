@@ -537,7 +537,7 @@ select {
 .segmented button + button {
   border-left: 1px solid var(--input-line);
 }
-.segmented button:hover:not(:disabled) {
+.segmented button:hover:not(:disabled):not([aria-checked='true']) {
   color: var(--fg);
 }
 .segmented button[aria-checked='true'] {

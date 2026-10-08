@@ -2,7 +2,7 @@
   "name": "managedcode-nuget-package-manager",
   "displayName": "NuGet Package Manager by ManagedCode",
   "description": "Review and update NuGet dependencies by package family, version scope, and declaration file.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "managedcode",
   "license": "MIT",
   "engines": {

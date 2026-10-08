@@ -2,6 +2,12 @@
 
 Changes are recorded here for each verified release.
 
+## 0.1.5
+
+- Add All, Stable, Minor and Patch update search presets while keeping independent package and family selection.
+- Describe version changes numerically without inferring API breakage, features or fixes; remove major warning colors and the patch-only recommendation.
+- Fix selected search button contrast on hover and verify compact editor and sidebar layouts in light and dark themes.
+
 ## 0.1.4
 
 - Include existing explicit NuGet project SDK declarations, such as Aspire.AppHost.Sdk, in family reviews and updates in VS Code and the CLI. Preserve versionless or absent SDKs; resolve each dependency's own available versions.

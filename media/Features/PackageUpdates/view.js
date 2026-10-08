@@ -1,11 +1,11 @@
 /* Workbench templates: groups first, a flat list on demand. Dynamic values are escaped; data-k keys let morphing reuse nodes. */
 (() => {
   const { esc, icon } = globalThis.NuGetDom;
-  const { collectKeys, selectionState, versionDiff } = globalThis.NuGetModel;
+  const { collectKeys, selectionState, versionDiff, searchModes, searchMode } = globalThis.NuGetModel;
 
   const plural = (count, word, many = `${word}s`) => `${count} ${count === 1 ? word : many}`;
   const attr = (name, on) => (on ? ` ${name}` : '');
-  const policies = { latest: 'Latest', minor: 'Minor & patch', patch: 'Patch only' };
+  const policyLabel = (state) => searchModes[searchMode(state.policy, state.prerelease)].label;
   const kinds = { major: 'Major', minor: 'Minor', patch: 'Patch', other: 'Other' };
   const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const spinner = '<span class="spinner" aria-hidden="true"></span>';
@@ -46,9 +46,8 @@
   function versionHtml(row) {
     if (row.status === 'update' || row.pending) {
       const { same, changed } = versionDiff(row.version, row.target);
-      const major = row.updateKind === 'major';
-      const tags = `${major ? '<span class="tag warn">major</span>' : ''}${String(row.target).includes('-') ? '<span class="tag">pre</span>' : ''}`;
-      return `<span class="ver${major ? ' major' : ''}">${tags}<span class="from">${esc(row.version)}</span><span class="arrow" aria-label="to">→</span><span class="to">${esc(same)}<b>${esc(changed)}</b></span></span>`;
+      const tags = String(row.target).includes('-') ? '<span class="tag">pre</span>' : '';
+      return `<span class="ver">${tags}<span class="from">${esc(row.version)}</span><span class="arrow" aria-label="to">→</span><span class="to">${esc(same)}<b>${esc(changed)}</b></span></span>`;
     }
     if (row.status === 'error')
       return `<span class="ver failed" title="${esc(row.error)}">${icon('error')}<span class="from">${esc(row.version)}</span></span>`;
@@ -89,7 +88,7 @@
     const parts = Object.keys(kinds)
       .map((kind) => [kind, distinct(updates.filter((row) => kindOf(row) === kind))])
       .filter(([, count]) => count)
-      .map(([kind, count]) => (kind === 'major' ? `<span class="warn">${count} major</span>` : `${count} ${kind}`));
+      .map(([kind, count]) => `${count} ${kind}`);
     return `${prefix}${parts.join(' · ')}`;
   }
 
@@ -228,7 +227,7 @@
         'current',
         'pass',
         'Everything is up to date',
-        `${plural(summary.packages, 'package')} checked${state.checkedAt ? ` at ${clock(state.checkedAt)}` : ''} · ${esc(policies[state.policy] ?? policies.latest)}`,
+        `${plural(summary.packages, 'package')} checked${state.checkedAt ? ` at ${clock(state.checkedAt)}` : ''} · ${esc(policyLabel(state))}`,
         btn('refresh', 'Check again'),
       );
     return '';
@@ -314,10 +313,10 @@
     const { ui, state } = ctx;
     if (!ui.options) return '';
     const files = state.files.filter((file) => file.count);
-    const policy = Object.entries(policies)
+    const policy = Object.entries(searchModes)
       .map(
-        ([value, label]) =>
-          `<button role="radio" aria-checked="${state.policy === value}" data-policy="${value}"${attr('disabled', state.busy)}>${esc(label)}</button>`,
+        ([value, mode]) =>
+          `<button role="radio" aria-checked="${searchMode(state.policy, state.prerelease) === value}" data-search-mode="${value}" title="${esc(mode.description)}"${attr('disabled', state.busy)}>${esc(mode.label)}</button>`,
       )
       .join('');
     const types = Object.entries(kinds)
@@ -327,7 +326,7 @@
       files.length > 1
         ? `<div class="field"><span class="field-label">Package file</span><select id="file" aria-label="Package file"><option value="">All files</option>${files.map((file) => `<option value="${esc(file.uri)}"${attr('selected', file.uri === ui.file)}>${esc(file.label)}</option>`).join('')}</select></div>`
         : '';
-    return `<div class="options" id="options" data-k="options"><div class="field"><span class="field-label">Versions</span><div class="segmented" role="radiogroup" aria-label="Version policy">${policy}</div></div><div class="field"><span class="field-label">Show</span><div class="toggles">${types}</div><label class="check"><input type="checkbox" id="show-all"${attr('checked', ui.showAll)}>Show up-to-date packages</label></div>${fileField}<div class="field-foot"><button class="link" data-action="reset-filters">Reset</button><button class="link" data-action="toggle-options">Done</button></div></div>`;
+    return `<div class="options" id="options" data-k="options"><div class="field"><span class="field-label">Versions</span><div class="segmented" role="radiogroup" aria-label="Update search">${policy}</div></div><div class="field"><span class="field-label">Show</span><div class="toggles">${types}</div><label class="check"><input type="checkbox" id="show-all"${attr('checked', ui.showAll)}>Show up-to-date packages</label></div>${fileField}<div class="field-foot"><button class="link" data-action="reset-filters">Reset</button><button class="link" data-action="toggle-options">Done</button></div></div>`;
   }
 
   function chips(ctx) {
@@ -337,7 +336,7 @@
     const chip = (id, label, className = '') =>
       `<span class="chip${className}"><span>${esc(label)}</span><button data-clear="${id}" aria-label="Remove ${esc(label)} filter">${icon('close')}</button></span>`;
     if (ui.group && !ctx.wide) items.push(chip('group', ctx.groupName));
-    if (state.policy !== 'latest') items.push(chip('policy', policies[state.policy]));
+    if (state.policy !== 'latest') items.push(chip('policy', policyLabel(state)));
     if (ui.kinds.size) items.push(chip('kinds', [...ui.kinds].map((kind) => kinds[kind]).join(', ')));
     if (ui.file) items.push(chip('file', state.files.find((file) => file.uri === ui.file)?.label ?? 'File'));
     if (ui.showAll) items.push(chip('showAll', 'Up-to-date shown'));
@@ -365,7 +364,7 @@
     const choices = row.versions.slice().reverse();
     const target =
       row.status === 'update' && choices.length
-        ? `<select class="target" data-target-key="${esc(row.key)}" aria-label="Target version in ${esc(row.fileLabel)}"${attr('disabled', ctx.state.busy)}>${choices.map((version) => `<option value="${esc(version)}"${attr('selected', version === row.target)}>${esc(version)}</option>`).join('')}</select>${row.updateKind ? `<span class="tag${row.updateKind === 'major' ? ' warn' : ''}">${esc(row.updateKind)}</span>` : ''}`
+        ? `<select class="target" data-target-key="${esc(row.key)}" aria-label="Target version in ${esc(row.fileLabel)}"${attr('disabled', ctx.state.busy)}>${choices.map((version) => `<option value="${esc(version)}"${attr('selected', version === row.target)}>${esc(version)}</option>`).join('')}</select>${row.updateKind ? `<span class="tag">${esc(row.updateKind)}</span>` : ''}`
         : `<span class="muted${row.status === 'error' ? ' err' : ''}">${esc({ current: 'Up to date', error: row.error || 'Check failed', checking: 'Checking…', unchecked: 'Not checked' }[row.status] ?? '')}</span>`;
     return `<div class="decl-card" data-k="dc:${esc(row.key)}"><div class="decl-file">${icon('file')}<span title="${esc(row.fileLabel)}">${esc(row.fileLabel)}</span><button class="link" data-action="openFile" data-key="${esc(row.key)}">Open</button></div><div class="decl-meta">${esc(row.kind)}${row.condition ? ` · ${esc(row.condition)}` : ''}</div><div class="decl-grid"><span class="label">Current</span><span class="mono">${esc(row.version)}</span><span class="label">Target</span><span class="target-cell">${target}</span></div></div>`;
   }
@@ -377,22 +376,19 @@
     if (!total)
       return `<div class="insp-empty" data-k="insp-empty">${icon('package')}<p>Select a package to see its declarations and available versions.</p></div>`;
     const notesByKind = {
-      major: 'May break APIs',
-      minor: 'New features',
-      patch: 'Fixes',
-      other: 'Revisions, prereleases',
+      major: 'First number changed',
+      minor: 'Second number changed',
+      patch: 'Third number changed',
+      other: 'Revision or prerelease changed',
     };
     const rows = Object.keys(kinds)
       .filter((kind) => counts[kind])
       .map(
         (kind) =>
-          `<button class="kind-row" data-kind-only="${kind}" aria-pressed="${ctx.ui.kinds.size === 1 && ctx.ui.kinds.has(kind)}" title="Show only ${kind} updates"><span class="tag${kind === 'major' ? ' warn' : ''}">${kind}</span><span>${notesByKind[kind]}</span><span class="count">${counts[kind]}</span></button>`,
+          `<button class="kind-row" data-kind-only="${kind}" aria-pressed="${ctx.ui.kinds.size === 1 && ctx.ui.kinds.has(kind)}" title="Show only ${kind} updates"><span class="tag">${kind}</span><span>${notesByKind[kind]}</span><span class="count">${counts[kind]}</span></button>`,
       )
       .join('');
-    const patches = counts.patch
-      ? `<div class="insp-actions"><button class="btn secondary" data-action="review-kind" data-kind-review="patch"${attr('disabled', state.busy || !state.trusted)}>Update ${plural(counts.patch, 'patch package')}</button></div>`
-      : '';
-    return `<div class="insp" data-k="insp-overview"><div class="insp-head"><span class="insp-mark">${icon('nuget')}</span><div class="insp-title"><h2>${plural(total, 'update')}</h2><div class="crumbs">${state.checkedAt ? `Checked ${clock(state.checkedAt)} · ` : ''}${esc(ctx.feedText)}</div></div></div><div class="kinds">${rows}</div>${patches}<p class="fine">Select a package to see its declarations and available versions.</p></div>`;
+    return `<div class="insp" data-k="insp-overview"><div class="insp-head"><span class="insp-mark">${icon('nuget')}</span><div class="insp-title"><h2>${plural(total, 'update')}</h2><div class="crumbs">${state.checkedAt ? `Checked ${clock(state.checkedAt)} · ` : ''}${esc(ctx.feedText)}</div></div></div><div class="kinds">${rows}</div><p class="fine">Select a package to see its declarations and available versions.</p></div>`;
   }
 
   function inspector(ctx) {
@@ -430,7 +426,6 @@
     const byKey = new Map(state.rows.map((row) => [row.key, row]));
     const files = [...new Set(plan.map((change) => change.file))];
     const packages = new Set(plan.map((change) => lower(change.packageId))).size;
-    const majors = plan.filter((change) => byKey.get(change.key)?.updateKind === 'major').length;
     const central = plan.some((change) => byKey.get(change.key)?.kind === 'PackageVersion');
     const sections = files
       .map((file) => {
@@ -444,7 +439,9 @@
         return `<section class="review-file" data-k="rf:${esc(file)}"><header>${icon('file')}<span class="path" title="${esc(changes[0].fileLabel)}">${esc(changes[0].fileLabel)}</span><span class="count">${changes.length}</span><button class="btn secondary sm" data-action="preview" data-file="${esc(file)}">${icon('diff')}Diff</button></header>${rows}</section>`;
       })
       .join('');
-    const notices = `${majors ? `<div class="banner warning">${icon('warning')}<span>${plural(majors, 'major update')} may include breaking changes.</span></div>` : ''}${central ? `<div class="banner info">${icon('info')}<span>Central package versions apply to every project that uses them.</span></div>` : ''}`;
+    const notices = central
+      ? `<div class="banner info">${icon('info')}<span>Central package versions apply to every project that uses them.</span></div>`
+      : '';
     return `<section class="review" data-k="review" aria-label="Review updates"><header class="review-head"><button class="icon-btn" data-action="back" title="Back to packages" aria-label="Back to packages"${attr('disabled', state.busy)}>${icon('back')}</button><div><h2>Update ${plural(packages, 'package')}</h2><p>${plural(plan.length, 'change')} in ${plural(files.length, 'file')}</p></div></header><div class="review-body">${notices}${sections}</div><footer class="review-foot"><p class="fine">Edits go through VS Code and can be undone. Files with unsaved changes stay unsaved.</p><div class="buttons"><button class="btn secondary" data-action="back"${attr('disabled', state.busy)}>Back</button><button class="btn primary" data-action="apply"${attr('disabled', state.busy || !state.trusted)}>${state.activity === 'apply' ? 'Applying…' : `Apply ${plural(plan.length, 'change')}`}</button></div></footer></section>`;
   }
 
