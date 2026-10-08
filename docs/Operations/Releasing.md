@@ -1,6 +1,6 @@
 # Release operations
 
-The release flow versions the VS Code extension and `nuget-manager` tool together, verifies a successful main-branch build, publishes a version-tagged GitHub release, and can then publish the exact released VSIX to the VS Code Marketplace. NuGet and GitHub release success do not imply Marketplace publication. The technical extension name is `managedcode-nuget-package-manager`, its VS Code ID is `managedcode.managedcode-nuget-package-manager`, and its display name is **NuGet Package Manager by ManagedCode**. Automated Marketplace publication is pending the GitHub Actions publisher identity; the publishing job currently has no authentication configuration. Automatic publication, including the first publication, can be enabled after the publisher identity is connected and verified once.
+The release flow versions the VS Code extension and `nuget-manager` tool together, verifies a successful main-branch build, publishes a version-tagged GitHub release, and can then publish the exact released VSIX to the VS Code Marketplace. NuGet and GitHub release success do not imply Marketplace publication. The technical extension name is `managedcode-nuget-package-manager`, its VS Code ID is `managedcode.managedcode-nuget-package-manager`, and its display name is **NuGet Package Manager by ManagedCode**. The user authorized the organization secret `VSCODE_MARKETPLACE_TOKEN` for this repository’s publishing job. Automatic publication is enabled with `MARKETPLACE_PUBLISH=true`; a successful workflow and public gallery check remain the proof of delivery. Automatic publication, including the first publication, can be enabled after the publisher identity is connected and verified once.
 
 ## Version and GitHub release
 
@@ -44,7 +44,7 @@ The workflow uses the official [`azure/login` action](https://github.com/Azure/l
 
 ### Transitional PAT authentication
 
-If workload identity is not yet available, a `VSCE_PAT` with the Marketplace **Manage** permission can be used as a protected secret for the `marketplace` environment. Prefer OIDC for new setup. Microsoft retires existing global Azure DevOps PATs on December 1, 2026 ([official retirement notice](https://learn.microsoft.com/en-us/azure/devops/release-notes/2026/general/sprint-270-update)); plan to move off PAT-based publishing before that date. Do not request or paste tokens into chat or repository files.
+If workload identity is not yet available, a token with the Marketplace **Manage** permission can be used as `VSCE_PAT` in the protected `marketplace` environment or the existing organization secret `VSCODE_MARKETPLACE_TOKEN` available to this repository. The workflow prefers `VSCE_PAT` when both names exist. Prefer OIDC for new setup. Microsoft retires existing global Azure DevOps PATs on December 1, 2026 ([official retirement notice](https://learn.microsoft.com/en-us/azure/devops/release-notes/2026/general/sprint-270-update)); plan to move off PAT-based publishing before that date. Do not request or paste tokens into chat or repository files.
 
 ### Optional manual first publication
 

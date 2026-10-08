@@ -52,7 +52,7 @@ jobs:
         env:
           CLIENT_ID: ${{ vars.MARKETPLACE_AZURE_CLIENT_ID }}
           TENANT_ID: ${{ vars.MARKETPLACE_AZURE_TENANT_ID }}
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT || secrets.VSCODE_MARKETPLACE_TOKEN }}
         shell: bash
         run: |
           if [[ -n "$CLIENT_ID" || -n "$TENANT_ID" ]]; then
@@ -64,7 +64,7 @@ jobs:
           elif [[ -n "$VSCE_PAT" ]]; then
             echo 'mode=pat' >> "$GITHUB_OUTPUT"
           else
-            echo '::error::Marketplace publisher authentication is missing. Configure Entra/OIDC variables or the VSCE_PAT secret. See docs/Operations/Releasing.md.'
+            echo '::error::Marketplace publisher authentication is missing. Configure Entra/OIDC variables, VSCE_PAT, or VSCODE_MARKETPLACE_TOKEN. See docs/Operations/Releasing.md.'
             echo 'Marketplace publication is pending publisher authentication; GitHub/NuGet assets remain available.' >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
@@ -92,7 +92,7 @@ jobs:
         env:
           AUTH_MODE: ${{ steps.auth.outputs.mode }}
           VSIX: ${{ steps.asset.outputs.path }}
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          VSCE_PAT: ${{ secrets.VSCE_PAT || secrets.VSCODE_MARKETPLACE_TOKEN }}
         shell: bash
         run: |
           if [[ "$AUTH_MODE" == 'oidc' ]]; then

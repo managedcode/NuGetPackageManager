@@ -143,6 +143,28 @@ function waitForExtensionActivation<T>(extension: vscode.Extension<T>, timeoutMs
   });
 }
 
+function waitForSidebarResolution(
+  views: { sidebar?: vscode.WebviewView },
+  timeoutMs = 10_000,
+): Promise<vscode.WebviewView> {
+  return new Promise((resolve, reject) => {
+    let pollTimer: NodeJS.Timeout;
+    const deadline = setTimeout(() => {
+      clearTimeout(pollTimer);
+      reject(new Error('The native NuGet container did not resolve its Packages webview.'));
+    }, timeoutMs);
+    const checkResolution = () => {
+      if (views.sidebar) {
+        clearTimeout(deadline);
+        resolve(views.sidebar);
+        return;
+      }
+      pollTimer = setTimeout(checkResolution, 25);
+    };
+    checkResolution();
+  });
+}
+
 export async function run(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(folder, 'host test runner must open its isolated fixture workspace');
@@ -181,9 +203,11 @@ export async function run(): Promise<void> {
         views: { sidebar?: vscode.WebviewView; panel?: vscode.WebviewPanel };
       }
     ).views;
-    assert.ok(views.sidebar, 'opening the native container must resolve its Packages webview');
+    const resolvedSidebar = await waitForSidebarResolution(views);
+    assert.ok(resolvedSidebar, 'opening the native container must resolve its Packages webview');
     await vscode.commands.executeCommand(openCommand);
-    assert.equal(views.sidebar.visible, true, 'the default open command must focus the native sidebar');
+    await waitForSidebarVisibility(resolvedSidebar, true);
+    assert.equal(resolvedSidebar.visible, true, 'the default open command must focus the native sidebar');
     await workbench.refresh();
     await vscode.commands.executeCommand(`${commandPrefix}.checkUpdates`);
     await workbench.check();
