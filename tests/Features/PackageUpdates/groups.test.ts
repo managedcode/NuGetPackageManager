@@ -201,7 +201,11 @@ test('an empty workspace has no groups and no packages', () => {
 
 test('TST-SDK-017 explicit SDK rows join their existing package family without creating absent SDKs', () => {
   const libraries = [row('Aspire.Hosting'), row('Aspire.Hosting.Redis')];
-  const sdk = row('Aspire.AppHost.Sdk', { kind: 'Sdk', file: api, fileLabel: 'AppHost.csproj' });
+  const sdk = row('Aspire.AppHost.Sdk', {
+    kind: 'Sdk',
+    file: 'file:///workspace/AppHost.csproj',
+    fileLabel: 'AppHost.csproj',
+  });
   const groups = model.groupView([...libraries, sdk]);
   const aspire = groups.find((group) => group.name === 'Aspire')!;
   assert.deepEqual(
