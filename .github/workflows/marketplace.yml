@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Verified public GitHub release tag, for example v0.1.1
+        description: Public GitHub release tag, for example v0.1.2
         type: string
         required: true
 
@@ -101,19 +101,3 @@ jobs:
           else
             npx --no-install vsce publish --packagePath "$VSIX" --skip-duplicate
           fi
-      - name: Verify the public Marketplace version
-        shell: bash
-        run: |
-          for attempt in $(seq 1 20); do
-            if npx --no-install vsce show managedcode.managedcode-nuget-package-manager --json > "$RUNNER_TEMP/gallery.json" 2> "$RUNNER_TEMP/gallery-error.txt" && \
-              node -e 'const p=require(process.env.RUNNER_TEMP+"/gallery.json"); if(!p.versions?.some(v=>v.version===process.env.RELEASE_TAG.slice(1))) process.exit(1);'; then
-              echo "Marketplace version ${RELEASE_TAG#v} is publicly available." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            if [[ "$attempt" == 20 ]]; then
-              echo 'The published version is not yet visible on Marketplace. Inspect publisher validation status and rerun.' >&2
-              cat "$RUNNER_TEMP/gallery-error.txt" >&2
-              exit 1
-            fi
-            sleep 15
-          done

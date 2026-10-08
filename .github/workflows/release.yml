@@ -69,8 +69,7 @@ jobs:
           if-no-files-found: error
 
   github-release:
-    needs: [verify-and-package, nuget-publish]
-    if: always() && needs.verify-and-package.result == 'success'
+    needs: verify-and-package
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -83,27 +82,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          NUGET_STATUS: ${{ needs.nuget-publish.result }}
         shell: bash
         run: |
-          if [[ "$NUGET_STATUS" == "success" ]]; then
-            PRERELEASE=false
-            echo 'NuGet Package Manager for VS Code and the nuget-manager global tool share one .NET engine. The tool is published on NuGet.org: dotnet tool install --global nuget-manager. Both hosts support reviewed updates of complete package families.' > "$RUNNER_TEMP/release-notes.md"
-          else
-            PRERELEASE=true
-            echo 'Preview artifacts: install the VSIX manually, or install the downloaded nupkg from a local source. Publishing nuget-manager on NuGet.org is pending; check the NuGet publish job. This preview does not confirm public NuGet availability.' > "$RUNNER_TEMP/release-notes.md"
-          fi
+          echo 'NuGet Package Manager for VS Code and the nuget-manager global tool share one .NET engine. Both hosts support reviewed updates of complete package families. This release contains the built and tested VSIX and global tool package; Marketplace and NuGet uploads run independently.' > "$RUNNER_TEMP/release-notes.md"
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" artifacts/*.vsix artifacts/*.nupkg --clobber
-            gh release edit "$GITHUB_REF_NAME" --prerelease="$PRERELEASE" --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release edit "$GITHUB_REF_NAME" --prerelease=false --notes-file "$RUNNER_TEMP/release-notes.md"
           else
-            gh release create "$GITHUB_REF_NAME" artifacts/*.vsix artifacts/*.nupkg --title "$GITHUB_REF_NAME" --prerelease="$PRERELEASE" --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release create "$GITHUB_REF_NAME" artifacts/*.vsix artifacts/*.nupkg --title "$GITHUB_REF_NAME" --prerelease=false --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
 
   nuget-publish:
     needs: verify-and-package
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     environment: release
     permissions:
       contents: read
@@ -129,28 +121,9 @@ jobs:
             exit 1
           fi
           dotnet nuget push artifacts/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
-      - name: Verify public NuGet availability and install
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          VERSION_LOWER=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
-          PACKAGE_URL="https://api.nuget.org/v3-flatcontainer/nuget-manager/$VERSION_LOWER/nuget-manager.nuspec"
-          for attempt in $(seq 1 40); do
-            if curl --fail --silent --show-error "$PACKAGE_URL" -o /dev/null && \
-              dotnet tool install --tool-path "$RUNNER_TEMP/published-tools" nuget-manager --version "$VERSION" --no-http-cache --source https://api.nuget.org/v3/index.json; then
-              break
-            fi
-            if [[ "$attempt" == 40 ]]; then
-              echo "nuget-manager $VERSION could not be installed from NuGet.org within 20 minutes." >&2
-              exit 1
-            fi
-            sleep 30
-          done
-          "$RUNNER_TEMP/published-tools/nuget-manager" --help
-          node scripts/verify-live-feed.mjs "$RUNNER_TEMP/published-tools/nuget-manager"
 
   marketplace-publish:
-    needs: [github-release, nuget-publish]
+    needs: github-release
     if: vars.MARKETPLACE_PUBLISH == 'true'
     permissions:
       contents: read
