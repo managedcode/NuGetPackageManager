@@ -1,6 +1,6 @@
 # ADR-0006: Explicit NuGet project SDK declarations
 
-Status: Accepted; implementation and independent review complete, CI/publication pending.
+Status: Implemented and published in 0.1.4.
 
 ## Context and decision
 
@@ -23,12 +23,12 @@ Join: native agent completion/status/wait, exact disjoint write scopes, final le
 
 TST-SDK-017: direct SDK discovery, literal spans, conditional independence, same-family mixed review/apply, per-package feed versions and dotted sibling exclusion. Negative cases: comments/CDATA/nested elements, missing versions, properties/ranges/wildcards/invalid IDs and stale edits. Preserve BOM/CRLF/quotes. CLI uses actual isolated HTTP feed and real executable. Bridge uses packaged shared engine; VS Code host uses real documents and WorkspaceEdit.
 
-Build: npm run build; dotnet build NuGetPackageManager.slnx -c Release. Formatting: Prettier and dotnet format. CI owns npm test, dotnet test, test:host and VSIX packaging. Pass: all required CI jobs green and the approved 0.1.4 release successfully published. Implementation status remains pending until evidence exists.
+Build: npm run build; dotnet build NuGetPackageManager.slnx -c Release. Formatting: Prettier and dotnet format. CI owns npm test, dotnet test, test:host and VSIX packaging. Pass: all required CI jobs green and the approved 0.1.4 release successfully published. [Three-platform CI](https://github.com/managedcode/NuGetPackageManager/actions/runs/37766811366) and [0.1.4 release](https://github.com/managedcode/NuGetPackageManager/actions/runs/37767129846) provide the completed verification and publication evidence.
 
 Compatibility: additive declaration kind coordinated with the bundled engine and TypeScript host. No persisted schema or configuration migration. Existing explicit package behavior remains unchanged. Rollout is the user-approved 0.1.4 release; rollback reverts the scoped implementation commit without moving historical tags.
 
 ## Implementation join evidence
 
-TASK-040 and TASK-041 are complete. TASK-042 independent read-only review found no high/medium defects. Canonical solution and extension builds passed; no local tests were run. CI is the required regression and publication gate for 0.1.4.
+TASK-040 and TASK-041 are complete. TASK-042 independent read-only review found no high/medium defects. Canonical solution and extension builds passed; no local tests were run. [CI passed on Linux, Windows and macOS](https://github.com/managedcode/NuGetPackageManager/actions/runs/37766811366), including real VS Code host integration. [Release 0.1.4](https://github.com/managedcode/NuGetPackageManager/actions/runs/37767129846) passed packaging and uploads to GitHub, NuGet and Marketplace. The first CI identified a test-fixture path error; commit e0cb679 corrected it before the successful run. No local tests were run.
 
 Maintainability exception: LocalFeedTests exceeds the 350-line outer-type limit because the CLI HTTP regressions share its isolated disposable server. It remains below the 500-line file limit. Split the feed fixture and scenarios before another change would exceed that file limit; no product-code limit changes.

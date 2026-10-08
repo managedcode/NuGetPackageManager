@@ -50,7 +50,7 @@ Failure behavior: incomplete feed checks remain failed; cancellation leaves unfi
 
 ## Explicit project SDK updates (REQ-013)
 
-Status: implementation in progress; not released. Owner: lead. Decision: [ADR-0006](../ADR/ADR-0006-explicit-sdk-updates.md).
+Status: implemented and published in 0.1.4; [three-platform CI](https://github.com/managedcode/NuGetPackageManager/actions/runs/37766811366) and [release publication](https://github.com/managedcode/NuGetPackageManager/actions/runs/37767129846) passed. Owner: lead. Decision: [ADR-0006](../ADR/ADR-0006-explicit-sdk-updates.md).
 
 REQ-013 (functional/contract, must; user request): discover literal `<Sdk Name="Aspire.AppHost.Sdk" Version="13.6.0" />` declarations and update them with the `Aspire` package family in VS Code and CLI. SDKs use the same listed-feed lookup, policy, exact review, snapshot validation and version-only edits as package references. SDK identity comes from `Name`; the declaration kind is `Sdk`. Every dependency resolves its own available version; family membership never forces equal versions or asserts cross-package compatibility.
 
@@ -60,6 +60,6 @@ Out of scope: `Project Sdk="Name/version"`, `Import Sdk`, global.json MSBuild SD
 
 Execution contract: TASK-040 lead owns docs, TypeScript declaration contract, bridge/host regression tests and integration. TASK-041 delegated engine worker owns PackageDocuments.cs, a new SdkDeclarationTests.cs and LocalFeedTests.cs only; starts after this spec/ADR, finishes with inspected diff and complete/blocked/failed/cancelled state. TASK-042 independent read-only reviewer joins after both coding scopes complete. Native collaboration status/wait provides joins. Existing project/runtime/feed boundaries stay intact. No temporary planning files are committed; the analysis and ordered plan live in ADR-0006.
 
-| Requirement | Acceptance | ADR      | Task             | Automated test                                                                                                | Evidence                                       |
-| ----------- | ---------- | -------- | ---------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| REQ-013     | AC-017     | ADR-0006 | TASK-040/041/042 | SDK parser/edit regressions, CLI local HTTP family update, JSON bridge and real VS Code host SDK review/apply | Pending CI for the user-approved 0.1.4 release |
+| Requirement | Acceptance | ADR      | Task             | Automated test                                                                                                | Evidence                                                                                                                                                                                                          |
+| ----------- | ---------- | -------- | ---------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REQ-013     | AC-017     | ADR-0006 | TASK-040/041/042 | SDK parser/edit regressions, CLI local HTTP family update, JSON bridge and real VS Code host SDK review/apply | [CI passed](https://github.com/managedcode/NuGetPackageManager/actions/runs/37766811366); [NuGet and Marketplace publication passed](https://github.com/managedcode/NuGetPackageManager/actions/runs/37767129846) |
