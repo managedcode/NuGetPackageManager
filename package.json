@@ -2,7 +2,7 @@
   "name": "managedcode-nuget-package-manager",
   "displayName": "NuGet Package Manager by ManagedCode",
   "description": "Review and update NuGet dependencies by package family, version scope, and declaration file.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "managedcode",
   "license": "MIT",
   "engines": {
@@ -187,9 +187,11 @@
     "coverage": "node scripts/test.mjs --coverage",
     "version:bump": "node scripts/release-version.mjs",
     "version:check": "node scripts/release-version.mjs --check",
-    "test:release": "node --test tests/ReleaseAutomation/version.test.mjs"
+    "test:release": "node --test tests/ReleaseAutomation/version.test.mjs",
+    "test:ui": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
     "@types/node": "^22.0.0",
     "@types/vscode": "1.100.0",
     "@vscode/test-electron": "^3.1.0",

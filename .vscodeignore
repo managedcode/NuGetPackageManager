@@ -30,3 +30,7 @@ media/screenshots/**
 *.brainstorm.md
 *.acceptance.md
 *.plan.md
+
+playwright.config.ts
+test-results/**
+playwright-report/**

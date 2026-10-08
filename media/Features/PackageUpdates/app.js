@@ -140,6 +140,9 @@
     scheduled = false;
     ctx = derive();
     patch(root, view.app(ctx));
+    for (const background of root.querySelectorAll('.masthead, .sidebar-launch, .controls, .families, .list')) {
+      background.inert = ui.drawer;
+    }
     if (focusAfter) {
       root.querySelector(focusAfter)?.focus();
       focusAfter = '';
@@ -389,6 +392,19 @@
 
   document.addEventListener('keydown', (event) => {
     const target = event.target instanceof Element ? event.target : null;
+    if (event.key === 'Tab' && ui.drawer) {
+      const controls = [
+        ...root.querySelectorAll(
+          '.inspector button:not(:disabled), .inspector select:not(:disabled), .inspector a[href]',
+        ),
+      ];
+      const edge = event.shiftKey ? controls[0] : controls.at(-1);
+      if (document.activeElement === edge || !target?.closest('.inspector')) {
+        event.preventDefault();
+        (event.shiftKey ? controls.at(-1) : controls[0])?.focus();
+      }
+      return;
+    }
     if (event.key === 'Escape') {
       if (ui.drawer) actions['close-drawer']();
       else if (ui.options) ui.options = false;

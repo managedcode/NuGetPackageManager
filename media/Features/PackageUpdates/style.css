@@ -498,6 +498,8 @@ select {
 }
 .options {
   display: grid;
+  max-height: 40vh;
+  overflow-y: auto;
   gap: 12px;
   padding: 10px;
   border: 1px solid var(--line);
@@ -799,8 +801,12 @@ progress.bar::-webkit-progress-value {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 22px;
-  padding: 0 9px;
+  min-height: 22px;
+  height: auto;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 2px 9px;
   border: 1px solid var(--input-line);
   border-radius: 11px;
   font-size: var(--small);
@@ -1365,6 +1371,7 @@ mark {
   flex: 1;
   min-height: 0;
   display: grid;
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 8px;
   padding: 8px;
@@ -1405,6 +1412,8 @@ mark {
   border-top: 1px solid var(--line);
 }
 .review-row .nm {
+  min-width: 0;
+  overflow-wrap: anywhere;
   grid-area: auto;
 }
 .review-row .meta {
@@ -1574,4 +1583,26 @@ body.vscode-high-contrast-light .fam.active {
   justify-content: flex-end;
   padding: 6px 8px;
   border-bottom: 1px solid var(--line);
+}
+
+.decl-grid .mono,
+.crumbs {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (height <= 600px) {
+  body:has(.banner) .options {
+    max-height: 25vh;
+  }
+}
+
+@media (width < 600px) {
+  .review-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .review-row .ver .from {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
 }

@@ -19,6 +19,7 @@ Use [MCAF](https://mcaf.managed-code.com/tutorial). Start from [docs/Architectur
 - Package: `npm run package`.
 - Version: `npm run version:bump -- patch|minor|major|X.Y.Z`; verify synchronized versions: `npm run version:check`.
 - Release helper regressions: `npm run test:release`.
+- Rendered UI regressions: `npm run test:ui` (Chromium; CI only under the current user direction).
 - UI preview: `npm run preview`; this supplements actual host tests.
 
 ## Architecture and boundaries
@@ -63,6 +64,6 @@ Durable user corrections and repeated mistakes become precise repository rules a
 
 The Marketplace technical name is managedcode-nuget-package-manager; displayName is NuGet Package Manager by ManagedCode and publisher managedcode. Both the original technical name and the original display name are already taken on Marketplace. Check both names before initial publication; search results are a preliminary check and Marketplace acceptance is the availability proof. Inspect both the JSON and VSIX XML manifests of the actual released artifact. Update all version files with the canonical helper, never move release tags, and do not rely on GITHUB_TOKEN tag push to trigger another workflow: explicitly dispatch Release after successful main matrix checks. Publish the exact GitHub VSIX artifact. Marketplace credentials belong to the marketplace environment and automatic publication is opt-in through MARKETPLACE_PUBLISH=true. A missing publisher identity is pending configuration, never evidence of publication.
 
-Version increments require an explicit human release decision. Do not create or publish a new NuGet version merely to test automation. The user requested the explicit project SDK update feature and authorized its patch release 0.1.4, with tests run in CI only. Preserve historical 0.1.1, 0.1.2 and 0.1.3 assets and tags.
+Version increments require an explicit human release decision. Do not create or publish a new NuGet version merely to test automation. The user requested the explicit project SDK update feature and authorized its patch release 0.1.4, with tests run in CI only. The user subsequently authorized 0.1.5 and the responsive UI correction release 0.1.6 after rendered inspection. Preserve all historical assets and tags.
 
 Publishing jobs finish on the registry upload result. The user explicitly removed post-publication NuGet install/index and Marketplace gallery polling gates. Keep build/tests and exact VSIX identity validation before upload; publish Marketplace independently of the NuGet upload. Do not block either publisher on indexing or create another version for recovery.

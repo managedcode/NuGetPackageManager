@@ -75,3 +75,9 @@ Plan: TASK-043 lead owns model mapping, message routing, regression assertions, 
 ## Discoverable editor and native controls (REQ-015)
 
 REQ-015 / AC-019: show a labeled Open manager action in the sidebar, including during review, opening the existing editor surface without changing selection or review. Use native VS Code button theme tokens. Search segments share one explicit height and fill the complete interior, including selected and hovered states. No grouping or version changes. Existing host command handles navigation; no architecture decision required. Focused host regression and visual resolution checks qualify this correction; tests run only in CI.
+
+## Rendered responsive regression gate (REQ-016)
+
+REQ-016 / AC-020: preserve complete usable UI across light/dark themes at 1366x768, 1024x600, 780x480, 779x480, 390x600, 320x600 and 260x480. All search segments fill their interior; deep family names and current versions stay contained. Filters scroll without eliminating the package list, including Restricted Mode. Multi-file review exposes every reviewed row through scrolling without section clipping; Apply stays visible. Drawer keyboard focus remains within visible details and Escape restores the workbench.
+
+Decision and ownership: [ADR-0007](../ADR/ADR-0007-rendered-ui-regressions.md), TASK-046 lead integration and TASK-047 browser test worker. Renderer fixtures are supplementary evidence; real host tests continue to validate actual file operations. User approved the patch release after renewed UI inspection; Manual rendered inspection completed, including all listed viewports, long-content fixtures, 260x480 Restricted Mode, multi-file review scrolling and keyboard recovery. Version 0.1.6 CI/release are pending.

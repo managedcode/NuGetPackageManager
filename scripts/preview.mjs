@@ -269,6 +269,13 @@ const declared = [
   ['Microsoft.NET.Test.Sdk', '17.14.1', api], ['Microsoft.NET.Test.Sdk', '17.14.1', core], ['xunit.v3', '3.0.1', api], ['xunit.v3', '3.0.1', core],
   ['xunit.runner.visualstudio', '3.1.4', api], ['Private.Build.Tools', '3.2.0', tools],
 ];
+if (params.has('stress')) {
+  for (const suffix of ['Abstractions', 'Hosting']) {
+    const id = 'Aspire.Microsoft.EntityFrameworkCore.Cosmos.' + suffix;
+    declared.push([id, '13.6.0-preview.1.123456789', props]);
+    feed[id] = ['13.6.1-preview.1.123456789', '13.6.1'];
+  }
+}
 const families = (id) => id.split('.').map((_, index, parts) => parts.slice(0, index + 1).join('.'));
 const rows = declared.map(([packageId, version, file], index) => ({
   key: file + '#' + index + ':' + packageId, packageId, version, start: index * 10, end: index * 10 + version.length,

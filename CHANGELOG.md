@@ -2,6 +2,14 @@
 
 Changes are recorded here for each verified release.
 
+## 0.1.6
+
+- Add a visible Open manager action in the sidebar and use native theme colors for primary controls.
+- Fix search segment height, overflowing deep family buttons, short-window filters and long declaration text.
+- Keep every multi-file review change reachable through scrolling and show narrow review versions below package names.
+- Keep keyboard focus inside the detail drawer and restore the workbench with Escape.
+- Add CI browser regressions for responsive layouts, long content, review containment and keyboard recovery in light and dark themes.
+
 ## 0.1.5
 
 - Add All, Stable, Minor and Patch update search presets while keeping independent package and family selection.

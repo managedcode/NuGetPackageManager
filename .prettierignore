@@ -18,3 +18,7 @@ coverage
 work
 tmp
 .tmp
+
+# Browser verification artifacts
+test-results/
+playwright-report/

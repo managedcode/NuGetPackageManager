@@ -49,3 +49,7 @@ coverage/
 /*.brainstorm.md
 /*.acceptance.md
 /*.plan.md
+
+# Browser verification artifacts
+test-results/
+playwright-report/
