@@ -53,7 +53,7 @@
     "commands": [
       {
         "command": "nugetPackageManager.open",
-        "title": "Open Package Workbench",
+        "title": "Open NuGet Package Manager",
         "category": "NuGet",
         "icon": "$(package)"
       },
@@ -71,7 +71,7 @@
       },
       {
         "command": "nugetPackageManager.openEditor",
-        "title": "Open Package Workbench in Editor",
+        "title": "Open NuGet Package Manager in Editor",
         "category": "NuGet",
         "icon": "$(open-preview)"
       },

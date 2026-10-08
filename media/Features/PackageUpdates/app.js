@@ -258,6 +258,7 @@
     back: () => send('back'),
     apply: () => send('apply'),
     settings: () => send('settings'),
+    openEditor: () => send('openEditor'),
     openFolder: () => send('openFolder'),
     manageTrust: () => send('manageTrust'),
     preview: (button) => send('preview', { file: button.dataset.file }),

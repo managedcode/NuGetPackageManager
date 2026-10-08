@@ -64,6 +64,9 @@ export async function routeMessage(target: MessageTarget, raw: unknown): Promise
     case 'packageLink':
       if (key) return target.openPackagePage(key);
       return;
+    case 'openEditor':
+      await vscode.commands.executeCommand('nugetPackageManager.openEditor');
+      return;
     case 'settings':
       await openFeedSettings();
       return;

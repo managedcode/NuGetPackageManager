@@ -143,8 +143,9 @@ export async function run(): Promise<void> {
       .plan?.map((change: { key: string }) => change.key)
       .sort();
     assert.ok(sharedReview?.length, 'the sidebar must create a real reviewed plan before opening the editor');
-    await vscode.commands.executeCommand(`${commandPrefix}.openEditor`);
-    assert.ok(views.panel, 'the optional editor command must open the second webview surface');
+    // REQ-015 / AC-019: the labeled sidebar action routes through the real host.
+    await sendHostMessage({ type: 'openEditor' });
+    assert.ok(views.panel, 'the sidebar Open manager action must open the second webview surface');
     assert.deepEqual(
       workbench
         .getState()

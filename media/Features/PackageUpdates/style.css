@@ -1,4 +1,4 @@
-/* NuGet workbench. Colors come from VS Code theme tokens; the primary action keeps the monochrome Managed Code brand. */
+/* NuGet workbench. Colors come from VS Code theme tokens; controls follow the active editor theme. */
 body {
   color-scheme: light dark;
   --font: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
@@ -21,8 +21,8 @@ body {
   --placeholder: var(--vscode-input-placeholderForeground, var(--muted));
   --badge-bg: var(--vscode-badge-background, #616161);
   --badge-fg: var(--vscode-badge-foreground, #f8f8f8);
-  --primary-bg: var(--fg);
-  --primary-fg: var(--surface);
+  --primary-bg: var(--vscode-button-background, #0078d4);
+  --primary-fg: var(--vscode-button-foreground, #ffffff);
   --secondary-bg: var(--vscode-button-secondaryBackground, #313131);
   --secondary-fg: var(--vscode-button-secondaryForeground, var(--fg));
   --secondary-hover: var(--vscode-button-secondaryHoverBackground, #3c3c3c);
@@ -518,6 +518,9 @@ select {
 }
 .segmented {
   display: flex;
+  height: 28px;
+  align-items: stretch;
+  align-self: start;
   min-width: 0;
   border: 1px solid var(--input-line);
   border-radius: 3px;
@@ -526,7 +529,7 @@ select {
 .segmented button {
   flex: 1 1 0;
   min-width: 0;
-  height: 24px;
+  height: auto;
   padding: 0 6px;
   overflow: hidden;
   color: var(--muted);
@@ -1564,4 +1567,11 @@ body.vscode-high-contrast-light .fam.active {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.sidebar-launch {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
 }

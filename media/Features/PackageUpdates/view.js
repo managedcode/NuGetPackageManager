@@ -446,7 +446,8 @@
   }
 
   function masthead(ctx) {
-    if (ctx.surface !== 'editor') return '';
+    if (ctx.surface !== 'editor')
+      return `<header class="sidebar-launch" data-k="sidebar-launch"><button class="btn secondary sm" data-action="openEditor" title="Open NuGet Package Manager in an editor tab">${icon('external')}Open manager</button></header>`;
     return `<header class="masthead" data-k="masthead"><span class="brand-mark">${icon('nuget')}</span><span class="brand"><strong>NuGet Package Manager</strong><span>by ManagedCode</span></span><span class="feeds" title="Configured feeds"><i></i>${esc(ctx.feedText)}</span><button class="icon-btn" data-action="settings" title="Configure package feeds" aria-label="Configure package feeds">${icon('gear')}</button></header>`;
   }
 
