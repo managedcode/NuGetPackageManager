@@ -253,3 +253,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## NuGet logo
+
+The NuGet mark is adapted from the official NuGet Gallery [header SVG](https://www.nuget.org/Content/gallery/img/logo-header.svg), with colors changed to the user-requested monochrome palette and the wordmark omitted. NuGet media is published by the NuGet project under [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/); see the [NuGet Media licensing statement](https://github.com/NuGet/Media#licensing). The original mark geometry is preserved in media/activity.svg, media/icon.svg and the webview brand icon.

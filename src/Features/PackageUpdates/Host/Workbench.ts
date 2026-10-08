@@ -1,13 +1,12 @@
 import * as vscode from 'vscode';
-import { randomUUID } from 'node:crypto';
 import type { Feed, PlannedChange, Policy, ViewState } from '../Contracts/types';
 import { mapConcurrent, validateFeedUrl } from './nuget';
 import { EngineClient } from './engine';
 import { scanWorkspace } from './workspace';
-import { getHtml } from './html';
+import { WorkbenchViews } from './WorkbenchViews';
 
 export class Workbench implements vscode.Disposable {
-  private panel?: vscode.WebviewPanel;
+  private readonly views: WorkbenchViews;
   private readonly client: EngineClient;
   private readonly allVersions = new Map<string, string[]>();
   private abort?: AbortController;
@@ -18,7 +17,6 @@ export class Workbench implements vscode.Disposable {
   private applying = false;
   private snapshots = new Map<string, string>();
   private sourceSnapshots = new Map<string, string>();
-  private previews = new Map<string, string>();
   private readonly output = vscode.window.createOutputChannel('NuGet Package Manager');
   private state: ViewState = {
     rows: [],
@@ -32,16 +30,18 @@ export class Workbench implements vscode.Disposable {
     prerelease: false,
   };
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext) {
     this.client = new EngineClient(
       vscode.Uri.joinPath(context.extensionUri, 'dist', 'engine', 'ManagedCode.NuGet.Tool.dll').fsPath,
     );
-    context.subscriptions.push(
-      this.output,
-      vscode.workspace.registerTextDocumentContentProvider('nuget-package-manager-preview', {
-        provideTextDocumentContent: (uri) => this.previews.get(uri.toString()) ?? '',
-      }),
+    this.views = new WorkbenchViews(
+      context,
+      (message) => {
+        void this.message(message).catch((error) => this.report(error));
+      },
+      () => this.abort?.abort(),
     );
+    context.subscriptions.push(this.output);
     const watcher = vscode.workspace.createFileSystemWatcher(
       '**/{Directory.Packages.props,*.csproj,*.fsproj,*.vbproj}',
     );
@@ -90,37 +90,11 @@ export class Workbench implements vscode.Disposable {
   }
 
   async open(): Promise<void> {
-    if (this.panel) {
-      this.panel.reveal();
-      return;
-    }
-    this.panel = vscode.window.createWebviewPanel(
-      'nugetPackageManager',
-      'NuGet Package Manager',
-      vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')],
-      },
-    );
-    this.panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media', 'activity.svg');
-    this.panel.webview.html = getHtml(this.panel.webview, this.context.extensionUri);
-    this.panel.onDidDispose(
-      () => {
-        this.panel = undefined;
-        this.abort?.abort();
-      },
-      undefined,
-      this.context.subscriptions,
-    );
-    this.panel.webview.onDidReceiveMessage(
-      (message) => {
-        void this.message(message).catch((error) => this.report(error));
-      },
-      undefined,
-      this.context.subscriptions,
-    );
+    await this.views.open();
+  }
+
+  openEditor(): void {
+    this.views.openEditor();
   }
 
   async refresh(check = false, retry = true): Promise<void> {
@@ -269,7 +243,7 @@ export class Workbench implements vscode.Disposable {
       throw new Error('Refresh the package list and select available updates.');
     this.state.plan = undefined;
     this.snapshots.clear();
-    this.previews.clear();
+    this.views.clearPreviews();
     this.state.busy = true;
     this.emit();
     const generation = this.generation;
@@ -313,18 +287,13 @@ export class Workbench implements vscode.Disposable {
     if (typeof file !== 'string' || !this.state.plan?.some((change) => change.file === file)) return;
     const text = this.snapshots.get(file);
     if (text === undefined) return;
-    const uri = vscode.Uri.from({
-      scheme: 'nuget-package-manager-preview',
-      path: `/${randomUUID()}/${vscode.Uri.parse(file).path.split('/').at(-1)}`,
-    });
-    this.previews.set(
-      uri.toString(),
+    await this.views.preview(
+      file,
       await this.client.apply(
         text,
         this.state.plan.filter((change) => change.file === file),
       ),
     );
-    await vscode.commands.executeCommand('vscode.diff', vscode.Uri.parse(file), uri, 'NuGet · Proposed changes');
   }
 
   async apply(): Promise<void> {
@@ -391,7 +360,8 @@ export class Workbench implements vscode.Disposable {
     const message = raw as Record<string, unknown>;
     switch (message.type) {
       case 'ready':
-        await this.refresh();
+        if (this.needsScan) await this.refresh();
+        else this.emit();
         break;
       case 'refresh':
         await this.refresh(true);
@@ -518,7 +488,7 @@ export class Workbench implements vscode.Disposable {
   }
 
   private emit(): void {
-    void this.panel?.webview.postMessage({ type: 'state', state: this.getState() });
+    this.views.post({ type: 'state', state: this.getState() });
   }
   private readFeeds(): Feed[] {
     const feeds = vscode.workspace
@@ -536,11 +506,11 @@ export class Workbench implements vscode.Disposable {
   private report(error: unknown): void {
     const message = error instanceof Error ? error.message : 'NuGet operation failed';
     this.output.appendLine(message);
-    void this.panel?.webview.postMessage({ type: 'error', message });
+    this.views.post({ type: 'error', message });
     void vscode.window.showErrorMessage(message);
   }
   dispose(): void {
     this.abort?.abort();
-    this.panel?.dispose();
+    this.views.dispose();
   }
 }

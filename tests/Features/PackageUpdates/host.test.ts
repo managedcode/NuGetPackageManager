@@ -94,6 +94,55 @@ function waitForDocumentText(uri: vscode.Uri, expected: string, timeoutMs = 5000
   });
 }
 
+function waitForSidebarVisibility(view: vscode.WebviewView, expected: boolean, timeoutMs = 5000): Promise<void> {
+  if (view.visible === expected) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      listener.dispose();
+      reject(new Error(`Timed out waiting for the sidebar to become ${expected ? 'visible' : 'hidden'}.`));
+    }, timeoutMs);
+    const listener = view.onDidChangeVisibility(() => {
+      if (view.visible !== expected) return;
+      clearTimeout(timer);
+      listener.dispose();
+      resolve();
+    });
+  });
+}
+
+function waitForPanelDisposal(panel: vscode.WebviewPanel, timeoutMs = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      listener.dispose();
+      reject(new Error('Timed out waiting for the editor workbench panel to close.'));
+    }, timeoutMs);
+    const listener = panel.onDidDispose(() => {
+      clearTimeout(timer);
+      listener.dispose();
+      resolve();
+    });
+  });
+}
+
+function waitForExtensionActivation<T>(extension: vscode.Extension<T>, timeoutMs = 10_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let pollTimer: NodeJS.Timeout;
+    const deadline = setTimeout(() => {
+      clearTimeout(pollTimer);
+      reject(new Error('The native NuGet view did not activate the extension.'));
+    }, timeoutMs);
+    const checkActivation = () => {
+      if (extension.isActive) {
+        clearTimeout(deadline);
+        resolve(extension.exports);
+        return;
+      }
+      pollTimer = setTimeout(checkActivation, 25);
+    };
+    checkActivation();
+  });
+}
+
 export async function run(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(folder, 'host test runner must open its isolated fixture workspace');
@@ -116,7 +165,10 @@ export async function run(): Promise<void> {
     await vscode.workspace
       .getConfiguration(commandPrefix)
       .update('feeds', [{ name: 'Host test feed', url: feed.url }], vscode.ConfigurationTarget.Workspace);
-    const workbench = await extension.activate();
+    await vscode.commands.executeCommand('workbench.view.extension.nugetPackageManager');
+    const workbench = (await waitForExtensionActivation(extension)) as Awaited<ReturnType<typeof extension.activate>>;
+    assert.equal(extension.isActive, true, 'opening the native NuGet container must activate the extension');
+    assert.ok(workbench, 'the native sidebar activation must expose the shared Workbench');
     for (const method of ['getState', 'refresh', 'check', 'review', 'apply']) {
       assert.equal(
         typeof (workbench as unknown as Record<string, unknown>)[method],
@@ -124,8 +176,15 @@ export async function run(): Promise<void> {
         `activation must return the public Workbench API method ${method}`,
       );
     }
+    const views = (
+      workbench as unknown as {
+        views: { sidebar?: vscode.WebviewView; panel?: vscode.WebviewPanel };
+      }
+    ).views;
+    assert.ok(views.sidebar, 'opening the native container must resolve its Packages webview');
     await vscode.commands.executeCommand(openCommand);
-    while (workbench.getState().busy) await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(views.sidebar.visible, true, 'the default open command must focus the native sidebar');
+    await workbench.refresh();
     await vscode.commands.executeCommand(`${commandPrefix}.checkUpdates`);
     await workbench.check();
     const initialScan = workbench.refresh();
@@ -184,6 +243,74 @@ export async function run(): Promise<void> {
         .sort(),
       orleansFamily.map((row: { key: string }) => row.key).sort(),
       'reviewing a dotted family must include every matching declaration',
+    );
+
+    const sharedReview = workbench
+      .getState()
+      .plan?.map((change: { key: string }) => change.key)
+      .sort();
+    assert.ok(sharedReview?.length, 'the sidebar must create a real reviewed plan before opening the editor');
+    await vscode.commands.executeCommand(`${commandPrefix}.openEditor`);
+    assert.ok(views.panel, 'the optional editor command must open the second webview surface');
+    assert.deepEqual(
+      workbench
+        .getState()
+        .plan?.map((change: { key: string }) => change.key)
+        .sort(),
+      sharedReview,
+      'opening the editor surface must preserve the sidebar review',
+    );
+
+    const sidebarView = views.sidebar;
+    assert.ok(sidebarView);
+    const sidebarHidden = waitForSidebarVisibility(sidebarView, false);
+    await vscode.commands.executeCommand('workbench.action.closeSidebar');
+    await sidebarHidden;
+    assert.equal(sidebarView.visible, false, 'the native sidebar should be hidden by the host command');
+    assert.deepEqual(
+      workbench
+        .getState()
+        .plan?.map((change: { key: string }) => change.key)
+        .sort(),
+      sharedReview,
+      'hiding the sidebar must preserve the shared review',
+    );
+    const sidebarRevealed = waitForSidebarVisibility(sidebarView, true);
+    await vscode.commands.executeCommand('workbench.action.toggleSidebarVisibility');
+    await sidebarRevealed;
+    assert.equal(sidebarView.visible, true, 'the native sidebar should become visible again');
+    assert.deepEqual(
+      workbench
+        .getState()
+        .plan?.map((change: { key: string }) => change.key)
+        .sort(),
+      sharedReview,
+      'revealing the sidebar must preserve the shared review',
+    );
+
+    const panel = views.panel;
+    assert.ok(panel);
+    const panelClosed = waitForPanelDisposal(panel);
+    panel.reveal();
+    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    await panelClosed;
+    assert.equal(views.panel, undefined, 'closing the editor surface must dispose only that surface');
+    assert.ok(views.sidebar, 'the native sidebar must remain available after closing the editor');
+    assert.deepEqual(
+      workbench
+        .getState()
+        .plan?.map((change: { key: string }) => change.key)
+        .sort(),
+      sharedReview,
+      'closing the editor surface must preserve the sidebar review',
+    );
+    await workbench.check();
+    state = workbench.getState();
+    assert.ok(
+      state.rows.some(
+        (row: { packageId: string; status: string }) => row.packageId === 'Central.Package' && row.status === 'update',
+      ),
+      'the remaining sidebar surface must continue to support package checks',
     );
 
     await workbench.review([childVersions[0].key]);

@@ -6,15 +6,11 @@
   --fg: var(--vscode-foreground, #eceee9);
   --muted: var(--vscode-descriptionForeground, #969e9e);
   --border: var(--vscode-panel-border, #30363a);
-  --accent: #ff7e5d;
-  --accent-ink: #161616;
-  --focus: var(--vscode-focusBorder, #ff7e5d);
+  --accent: var(--fg);
+  --accent-ink: var(--bg);
+  --focus: var(--vscode-focusBorder, #2d40ea);
   font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   font-size: 13px;
-}
-.vscode-light {
-  --accent: #b33a20;
-  --accent-ink: #fff;
 }
 .vscode-high-contrast-light,
 .vscode-high-contrast {
@@ -1119,9 +1115,11 @@ body {
   --panel: var(--vscode-sideBar-background, #1b1e22);
   --raised: var(--vscode-editorWidget-background, #24282d);
   --fg: var(--vscode-foreground, #eceee9);
+  --accent: var(--fg);
+  --accent-ink: var(--bg);
   --muted: var(--vscode-descriptionForeground, #969e9e);
   --border: var(--vscode-panel-border, #30363a);
-  --focus: var(--vscode-focusBorder, #ff7e5d);
+  --focus: var(--vscode-focusBorder, #2d40ea);
 }
 .vscode-light {
   color-scheme: light;
@@ -1173,4 +1171,303 @@ body {
   .summary {
     flex-wrap: wrap;
   }
+}
+
+/* Compact native sidebar only. Keep the editor workbench's three-pane layout unchanged. */
+body.surface-sidebar .shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  max-width: none;
+  overflow: hidden;
+  padding: 8px;
+}
+body.surface-sidebar .topbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  padding: 0;
+  border: 0;
+}
+body.surface-sidebar .brand,
+body.surface-sidebar .feed-label,
+body.surface-sidebar .hero .eyebrow,
+body.surface-sidebar .hero p,
+body.surface-sidebar .summary > div:not(.scan-status),
+body.surface-sidebar .sidebar-note,
+body.surface-sidebar .page-footer {
+  display: none;
+}
+body.surface-sidebar .hero {
+  flex: 0 0 auto;
+  min-height: 32px;
+  gap: 6px;
+  justify-content: flex-start;
+  padding: 0 0 7px;
+}
+body.surface-sidebar .hero > div {
+  display: none;
+}
+body.surface-sidebar .hero .primary {
+  padding: 7px 8px;
+  font-size: 11px;
+}
+body.surface-sidebar .summary {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0 0 7px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: var(--panel);
+}
+body.surface-sidebar .scan-status {
+  min-width: 0;
+  margin: 0;
+  gap: 6px;
+  font-size: 10px;
+}
+body.surface-sidebar .scan-status span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.surface-sidebar .workbench {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+  overflow: hidden;
+}
+body.surface-sidebar .sidebar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 3px;
+  max-height: min(26vh, 156px);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1px 1px 0;
+  scrollbar-width: thin;
+}
+body.surface-sidebar .sidebar .section-label {
+  flex: 0 0 100%;
+  margin: 0 0 2px;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+body.surface-sidebar .family {
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 5px 7px;
+  font-size: 10px;
+}
+body.surface-sidebar .family.subfamily {
+  padding-left: 7px;
+}
+body.surface-sidebar .family-update {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex: 0 0 100%;
+  width: 100%;
+  margin: 1px 0 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+}
+body.surface-sidebar .family-hint {
+  flex: 0 0 100%;
+  margin: 2px 1px 0;
+  font-size: 9px;
+}
+body.surface-sidebar .package-panel {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: auto;
+  min-height: 180px;
+  border-radius: 6px;
+}
+body.surface-sidebar .tabs {
+  gap: 12px;
+  padding: 0 9px;
+}
+body.surface-sidebar .tabs button {
+  gap: 5px;
+  padding: 8px 0 6px;
+  font-size: 11px;
+}
+body.surface-sidebar .tabs span {
+  padding: 2px 4px;
+}
+body.surface-sidebar .filters {
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 7px;
+}
+body.surface-sidebar .search {
+  flex: 1 1 100%;
+  min-width: 0;
+  padding: 0 7px;
+}
+body.surface-sidebar .search input {
+  padding: 6px 0;
+}
+body.surface-sidebar .filters select {
+  flex: 1 1 0;
+  width: 1px;
+  max-width: none;
+  padding: 5px 6px;
+  font-size: 10px;
+}
+body.surface-sidebar .policy-bar {
+  gap: 5px 8px;
+  padding: 0 7px 7px;
+}
+body.surface-sidebar .policy-bar label {
+  font-size: 10px;
+}
+body.surface-sidebar .policy-bar select {
+  max-width: 130px;
+  padding: 4px 5px;
+  font-size: 10px;
+}
+body.surface-sidebar #kind {
+  flex: 1 1 100%;
+  width: 100%;
+  margin: 0;
+}
+body.surface-sidebar .list-toolbar {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 5px 7px;
+  font-size: 10px;
+}
+body.surface-sidebar .list-toolbar .text-button {
+  margin-left: 0;
+  padding: 4px 0;
+  font-size: 10px;
+}
+body.surface-sidebar .package-list {
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+body.surface-sidebar .package-row {
+  grid-template-columns: 14px minmax(0, 1fr) 54px;
+  gap: 3px 6px;
+  padding: 8px 7px;
+}
+body.surface-sidebar .package-icon {
+  display: none;
+}
+body.surface-sidebar .package-identity {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+body.surface-sidebar .package-name {
+  font-size: 11px;
+}
+body.surface-sidebar .package-name small {
+  margin-top: 2px;
+  font-size: 9px;
+}
+body.surface-sidebar .version-change {
+  grid-column: 2;
+  grid-row: 2;
+  gap: 4px;
+  overflow: hidden;
+  font-size: 10px;
+}
+body.surface-sidebar .version-change code {
+  font-size: 10px;
+}
+body.surface-sidebar .package-row > .badge {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  padding: 3px 4px;
+  font-size: 9px;
+}
+body.surface-sidebar .selection-bar {
+  gap: 6px;
+  padding: 7px;
+  background: var(--panel);
+}
+body.surface-sidebar .selection-bar strong {
+  font-size: 11px;
+}
+body.surface-sidebar .selection-bar small {
+  max-width: 125px;
+  font-size: 9px;
+}
+body.surface-sidebar .selection-bar .primary {
+  max-width: 52%;
+  padding: 7px 8px;
+  white-space: normal;
+  font-size: 10px;
+}
+body.surface-sidebar .review-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 2px;
+  scrollbar-width: thin;
+}
+body.surface-sidebar .review-heading h2 {
+  font-size: 18px;
+}
+body.surface-sidebar .review-heading p,
+body.surface-sidebar .review-bottom p {
+  font-size: 10px;
+  line-height: 1.45;
+}
+body.surface-sidebar .review-file {
+  margin: 8px 0;
+}
+body.surface-sidebar .review-row {
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
+  gap: 4px;
+  padding: 7px;
+}
+body.surface-sidebar .review-row strong {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+body.surface-sidebar .review-row code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+}
+body.surface-sidebar .review-bottom {
+  position: sticky;
+  bottom: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 7px 0;
+  background: var(--bg);
+}
+body.surface-sidebar .review-bottom p {
+  margin: 0;
+}
+body.surface-sidebar .review-bottom .primary {
+  width: 100%;
+  padding: 8px;
+}
+body.surface-sidebar .detail.open {
+  width: min(360px, 100vw);
 }

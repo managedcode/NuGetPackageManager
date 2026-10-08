@@ -6,6 +6,7 @@ export function activate(context: vscode.ExtensionContext): Workbench {
   context.subscriptions.push(
     workbench,
     vscode.commands.registerCommand('nugetPackageManager.open', () => workbench.open()),
+    vscode.commands.registerCommand('nugetPackageManager.openEditor', () => workbench.openEditor()),
     vscode.commands.registerCommand('nugetPackageManager.refresh', async () => {
       await workbench.open();
       await workbench.refresh();

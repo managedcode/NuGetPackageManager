@@ -9,6 +9,7 @@ REQ-004 (safety, must): exact document snapshots, trusted workspace, version-onl
 REQ-005 (delivery, must): installable VSIX, tests and cross-platform CI, explicit unsupported features. AC-006.
 REQ-006 (contract/delivery, must; user scope expansion): one shared engine for VS Code and a published NuGet global tool with a user-approved simple name. AC-008. Shared parsing/version/feed/edit behavior must have no parallel TypeScript implementation; install the released tool from NuGet to verify delivery.
 REQ-007 (functional/UX, must; user's main differentiator): select all updates in a first-segment family or a narrower dotted prefix in one operation. AC-009. Microsoft.Orleans selects its descendants and exact root, never Microsoft.OrleansExtra; every selected declaration appears in the common review.
+REQ-008 (UX, must; locally verified, public release pending): expose a native NuGet Activity Bar icon and working Packages sidebar. AC-010: native activation discovers declarations; AC-011: sidebar/editor surfaces share review and preserve it across visibility/lifecycle changes; AC-012: compact theme-aware sidebar and existing wide editor layout; neutral monochrome branding matching Managed Code, without orange accents. Decision and execution contract: [ADR-0004](../ADR/ADR-0004-sidebar-workbench.md), [sidebar-workbench.plan.md](../../sidebar-workbench.plan.md). Traceability: REQ-008 → AC-010/011/012 → TASK-020/021/022/023 → TST-SIDE-010/011 actual host tests and TST-SIDE-012 visual evidence.
 
 ```mermaid
 flowchart LR

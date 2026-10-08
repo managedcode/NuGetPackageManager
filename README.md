@@ -9,13 +9,15 @@
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![Marketplace workflow](https://img.shields.io/github/actions/workflow/status/managedcode/NuGetPackageManager/marketplace.yml?branch=main&label=Marketplace%20workflow)](https://github.com/managedcode/NuGetPackageManager/actions/workflows/marketplace.yml)
 
-Review NuGet updates across a .NET workspace before changing declarations. Select a package family, inspect every proposed version, and review the complete change set before applying it. The same .NET 10 engine powers the VS Code workbench and the `nuget-manager` command-line tool.
+Review NuGet updates across a .NET workspace before changing declarations. Select a package family, inspect every proposed version, and review the complete change set before applying it. The same .NET 10 engine powers the VS Code workbench and the `nuget-manager` command-line tool. The interface uses Managed Code's neutral monochrome branding while following the active VS Code light, dark, or high-contrast theme.
 
 ![NuGet Package Manager workbench](https://raw.githubusercontent.com/managedcode/NuGetPackageManager/main/media/screenshots/workbench.png)
 
 ## VS Code
 
-Open **NuGet: Open Package Workbench** from the Command Palette, or use the context menu on a `Directory.Packages.props`, `.csproj`, `.fsproj`, or `.vbproj` file. Discover literal versions in central `PackageVersion` and project `PackageReference` entries, check available feed versions, then select updates by package, file, or family.
+Click the **NuGet** Activity Bar icon to open the native **Packages** sidebar. **NuGet: Open Package Workbench** focuses that view and discovers declarations without opening an editor tab. For the wide, three-column workbench, run **NuGet: Open Package Workbench in Editor** (`nugetPackageManager.openEditor`). You can also open the sidebar from the context menu on a `Directory.Packages.props`, `.csproj`, `.fsproj`, or `.vbproj` file. The sidebar keeps family filters, package selection, and review/apply controls in reach at its compact width.
+
+Both views use the same package state and review plan. Hiding or reopening one view preserves the active review; closing one view does not cancel work while the other remains open.
 
 Families use the first package ID segment by default. You can select a narrower dotted prefix, such as `Microsoft.Orleans`; matching includes that exact ID and its dot-delimited descendants, not similarly named IDs such as `Microsoft.OrleansExtra`. Selected updates share one review with exact target versions and native VS Code diffs.
 

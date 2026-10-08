@@ -2,6 +2,12 @@
 
 Changes are recorded here for each verified release.
 
+## 0.1.2
+
+- Add a dedicated NuGet icon to the VS Code Activity Bar and a compact package manager sidebar.
+- Keep grouped update review shared between the sidebar and the full editor workbench.
+- Use theme-aware monochrome Managed Code colors and the NuGet mark for the extension logo.
+
 ## 0.1.1
 
 - Use the branded Marketplace technical name `managedcode-nuget-package-manager` and display name `NuGet Package Manager by ManagedCode` to resolve initial publication name collisions.

@@ -16,8 +16,8 @@ const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NuGet Package Manager UI preview</title><link rel="icon" href="data:,"><link rel="stylesheet" href="/style.css">
 <style>
-:root{--vscode-editor-background:#15181b;--vscode-sideBar-background:#1b1e22;--vscode-editorWidget-background:#24282d;--vscode-foreground:#eceee9;--vscode-descriptionForeground:#969e9e;--vscode-panel-border:#30363a;--vscode-focusBorder:#ff7e5d;--vscode-button-background:#ff7e5d;--vscode-button-foreground:#21130f;--vscode-font-family:system-ui,sans-serif;--vscode-editor-font-family:ui-monospace,monospace}
-.vscode-light{color-scheme:light;--vscode-editor-background:#f7f8f5;--vscode-sideBar-background:#fff;--vscode-editorWidget-background:#edf0e9;--vscode-foreground:#222821;--vscode-descriptionForeground:#677066;--vscode-panel-border:#d8ded4;--vscode-focusBorder:#b33a20;--vscode-button-background:#b33a20;--vscode-button-foreground:#fff}
+:root{--vscode-editor-background:#15181b;--vscode-sideBar-background:#1b1e22;--vscode-editorWidget-background:#24282d;--vscode-foreground:#eceee9;--vscode-descriptionForeground:#969e9e;--vscode-panel-border:#30363a;--vscode-focusBorder:#2d40ea;--vscode-button-background:#2d40ea;--vscode-button-foreground:#ffffff;--vscode-font-family:system-ui,sans-serif;--vscode-editor-font-family:ui-monospace,monospace}
+.vscode-light{color-scheme:light;--vscode-editor-background:#f9f7f5;--vscode-sideBar-background:#fff;--vscode-editorWidget-background:#efeeec;--vscode-foreground:#161616;--vscode-descriptionForeground:#616161;--vscode-panel-border:#d3d8da;--vscode-focusBorder:#2d40ea;--vscode-button-background:#2d40ea;--vscode-button-foreground:#fff}
 .vscode-dark{color-scheme:dark}
 .preview-banner{font:12px system-ui;padding:10px 20px;background:#ffe7b3;color:#3a2a00;text-align:center}
 </style></head>

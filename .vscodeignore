@@ -27,3 +27,4 @@ dist/*.map
 **/*.pdb
 
 release-automation.*.md
+sidebar-workbench.*.md
