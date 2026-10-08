@@ -1,6 +1,6 @@
 # ADR-0008: Shared release qualification and reliable editor setup
 
-Status: accepted; CI verification pending. Date: 2026-10-08.
+Status: accepted and implemented. Date: 2026-10-08.
 
 ## Context and decision
 
@@ -22,4 +22,4 @@ Verification: formatting and syntax checks locally; all automated tests run in C
 
 ## Evidence
 
-Failure diagnosis: [CI 37794763453](https://github.com/managedcode/NuGetPackageManager/actions/runs/37794763453) failed on editor setup `AggregateError [ETIMEDOUT]`, before assertions. Its engine, Node and 16 rendered browser cases passed. [Release 37794021241](https://github.com/managedcode/NuGetPackageManager/actions/runs/37794021241) ran all configured code/UI/editor checks successfully before publishing 0.1.6. Repair qualification is pending the final pushed commit; this record does not claim a green result.
+Failure diagnosis: [CI 37794763453](https://github.com/managedcode/NuGetPackageManager/actions/runs/37794763453) failed on editor setup `AggregateError [ETIMEDOUT]`, before assertions. Its engine, Node and 16 rendered browser cases passed. [Release 37794021241](https://github.com/managedcode/NuGetPackageManager/actions/runs/37794021241) ran all configured code/UI/editor checks successfully before publishing 0.1.6. Repair commit d5f74fd passed [Release verification-only on all three platforms](https://github.com/managedcode/NuGetPackageManager/actions/runs/37799310309): 36 release/setup/qualification cases, 69 Node cases, .NET regressions, 16 rendered browser cases and actual VS Code host flows. [Credential-free Marketplace qualification](https://github.com/managedcode/NuGetPackageManager/actions/runs/37799315964) matched the public 0.1.6 VSIX against the tested artifact from Release 37794021241. All publication steps were skipped in these verification-only runs. TASK-048 independent review completed after timeout-class and incomplete-matrix corrections. No version/tag changed. Main CI of the final pushed commit remains a separate required delivery gate, including documentation-only follow-up commits.
