@@ -103,6 +103,7 @@ jobs:
   nuget-publish:
     needs: verify-and-package
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: release
     permissions:
       contents: read
@@ -134,13 +135,13 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           VERSION_LOWER=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
           PACKAGE_URL="https://api.nuget.org/v3-flatcontainer/nuget-manager/$VERSION_LOWER/nuget-manager.nuspec"
-          for attempt in $(seq 1 20); do
+          for attempt in $(seq 1 40); do
             if curl --fail --silent --show-error "$PACKAGE_URL" -o /dev/null && \
               dotnet tool install --tool-path "$RUNNER_TEMP/published-tools" nuget-manager --version "$VERSION" --no-http-cache --source https://api.nuget.org/v3/index.json; then
               break
             fi
-            if [[ "$attempt" == 20 ]]; then
-              echo "nuget-manager $VERSION could not be installed from NuGet.org within 10 minutes." >&2
+            if [[ "$attempt" == 40 ]]; then
+              echo "nuget-manager $VERSION could not be installed from NuGet.org within 20 minutes." >&2
               exit 1
             fi
             sleep 30

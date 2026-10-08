@@ -14,7 +14,7 @@ Run a bump only as part of an explicitly chosen release. The other supported arg
 
 The main three-OS CI preserves historical tags and skips release creation when the current version already has a tag. After a human-approved new version reaches `main`, CI verifies it and creates the matching immutable `vX.Y.Z` tag. A tag push made with `GITHUB_TOKEN` does not trigger another `push` workflow, so CI explicitly dispatches the `Release` workflow at that tag. Release can also be dispatched manually for recovery, using the existing tag rather than rebuilding from `main`.
 
-Release builds and validates the version-matched VSIX and NuGet tool package, then runs the public NuGet installation and live-feed checks. If publishing or verification fails, the GitHub release remains marked preview/pending; fix the cause and rerun the failed workflow jobs. Do not describe the version as delivered until the VSIX is attached and a fresh public NuGet install plus live feed check succeeds.
+Release builds and validates the version-matched VSIX and NuGet tool package, then runs the public NuGet installation and live-feed checks. Public installation retries allow 20 minutes for validation/indexing; the NuGet publishing job has a 30-minute bound. Microsoft describes validation/indexing as usually taking less than 15 minutes in its [publishing guidance](https://learn.microsoft.com/en-us/nuget/nuget-org/publish-a-package#package-validation-and-indexing). If publishing or verification fails, the GitHub release remains marked preview/pending; fix the cause and rerun the failed workflow jobs. Do not describe the version as delivered until the VSIX is attached and a fresh public NuGet install plus live feed check succeeds.
 
 ### Current 0.1.1 extension identity repair
 
