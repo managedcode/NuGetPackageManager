@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import * as vscode from 'vscode';
 import type { ViewState } from '../../../src/Features/PackageUpdates/Contracts/types';
 import { TestFeed, waitForSidebarVisibility } from './hostFeed';
+import { verifyQueuedScanInvalidation } from './hostQueueScenarios';
 import {
   WorkbenchApi,
   updatablePackageIds,
@@ -443,8 +444,9 @@ export async function runAutomaticCheckScenarios(scenario: Scenario): Promise<vo
   const opened = await verifyCheckOnOpen(scenario);
   const applied = await verifyApplyRechecksFromCache(scenario, opened);
   const refetched = await verifyExplicitChecksRefetch(scenario, applied);
-  const rescanned = await verifyRescanCommandUsesCache(scenario, refetched);
-  await verifyFeedChangeRefetches(scenario, rescanned);
+  await verifyRescanCommandUsesCache(scenario, refetched);
+  const queued = await verifyQueuedScanInvalidation(scenario);
+  await verifyFeedChangeRefetches(scenario, queued);
   const recovered = await verifyCancelledCheck(scenario);
   const edited = await verifyEditRechecksFromCache(scenario, recovered);
   const reopened = await verifyHiddenSurfaceDefersRecheck(scenario, edited);

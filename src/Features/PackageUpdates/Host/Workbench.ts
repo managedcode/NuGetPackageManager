@@ -96,7 +96,11 @@ export class Workbench implements MessageTarget, vscode.Disposable {
     if (this.applying) return;
     const mode: CheckMode | undefined = check === true ? 'fresh' : check || undefined;
     if (mode && this.checkAfterScan !== 'fresh') this.checkAfterScan = mode;
-    if (this.scanning) return;
+    if (this.scanning) {
+      // A debounce may just have ended after invalidation: publish its settled badge before returning.
+      this.emit();
+      return;
+    }
     this.cancelRecheck();
     this.scanning = true;
     this.abort?.abort();
