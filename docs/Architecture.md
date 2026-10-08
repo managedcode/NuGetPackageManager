@@ -38,3 +38,5 @@ Explicit project SDK support is specified in [ADR-0006](ADR/ADR-0006-explicit-sd
 Read [PackageUpdates](Features/PackageUpdates.md), [ADR-0002](ADR/ADR-0002-shared-dotnet-engine.md), [ADR-0004](ADR/ADR-0004-sidebar-workbench.md), [ADR-0005](ADR/ADR-0005-workbench-redesign.md) for contracts. [ADR 0001](ADR/0001-native-workbench.md) records the superseded prototype. No server, database or separate product repository is required.
 
 Version-driven release and Marketplace publishing are defined in [ADR-0003](ADR/ADR-0003-versioned-publishing.md) and [release operations](Operations/Releasing.md). Successful main CI creates an immutable version tag and explicitly dispatches Release. Marketplace publishing consumes the verified GitHub VSIX through a separately authenticated workflow.
+
+[ADR-0008](ADR/ADR-0008-release-test-qualification.md) makes CI and Release share the same qualification matrix. Marketplace recovery matches its public VSIX against the successful Release artifact for the exact tag commit. Setup retries apply only to editor download, and do not wrap host assertions.

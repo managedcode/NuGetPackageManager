@@ -4,6 +4,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      verify_only:
+        description: Run all qualification checks without creating a release or publishing packages
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,72 +19,28 @@ concurrency:
 
 jobs:
   verify-and-package:
-    timeout-minutes: 20
+    uses: ./.github/workflows/verify.yml
+    with:
+      require_tag: ${{ !inputs.verify_only }}
+      live_feed: true
+
+  stage-packages:
+    needs: verify-and-package
+    if: ${{ !inputs.verify_only }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/download-artifact@v4
         with:
-          dotnet-version: 10.0.x
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-      - name: Validate tagged versions before packaging
-        shell: bash
-        run: |
-          VERSION=$(node scripts/release-version.mjs --check)
-          test "$GITHUB_REF_NAME" = "v$VERSION"
-      - run: npm run test:release
-      - run: dotnet restore NuGetPackageManager.slnx
-      - run: dotnet format NuGetPackageManager.slnx --verify-no-changes --no-restore
-      - run: dotnet test NuGetPackageManager.slnx --configuration Release --no-restore
-      - name: Pack global tool
-        run: dotnet pack dotnet/ManagedCode.NuGet.Tool/ManagedCode.NuGet.Tool.csproj --configuration Release --output artifacts
-      - name: Smoke install global tool
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          dotnet tool install --tool-path "$RUNNER_TEMP/tools" --source artifacts nuget-manager --version "$VERSION"
-          "$RUNNER_TEMP/tools/nuget-manager" --help
-          node scripts/verify-live-feed.mjs "$RUNNER_TEMP/tools/nuget-manager"
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
-      - run: npm test
-      - name: Install browser for renderer regressions
-        run: npx playwright install --with-deps chromium
-      - name: Rendered responsive UI regressions
-        run: npm run test:ui
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: release-renderer-ui-evidence
-          path: test-results/ui/
-          if-no-files-found: ignore
-      - run: npm run format:check
-      - run: npm run package
-      - name: VS Code host integration tests
-        run: xvfb-run -a npm run test:host
-      - name: Match tag to both package versions
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          TOOL_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' dotnet/ManagedCode.NuGet.Tool/ManagedCode.NuGet.Tool.csproj | head -n 1)
-          test "$VERSION" = "$TOOL_VERSION"
-          test "$GITHUB_REF_NAME" = "v$VERSION"
+          name: verified-packages
+          path: artifacts
       - uses: actions/upload-artifact@v4
         with:
           name: release-packages
-          path: |
-            artifacts/*.vsix
-            artifacts/*.nupkg
+          path: artifacts/
           if-no-files-found: error
 
   github-release:
-    needs: verify-and-package
+    needs: stage-packages
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -103,7 +64,7 @@ jobs:
           fi
 
   nuget-publish:
-    needs: verify-and-package
+    needs: stage-packages
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: release
@@ -137,8 +98,10 @@ jobs:
     if: vars.MARKETPLACE_PUBLISH == 'true'
     permissions:
       contents: read
+      actions: read
       id-token: write
     uses: ./.github/workflows/marketplace.yml
     with:
       release_tag: ${{ github.ref_name }}
+      qualification_run_id: ${{ github.run_id }}
     secrets: inherit

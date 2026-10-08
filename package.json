@@ -187,7 +187,7 @@
     "coverage": "node scripts/test.mjs --coverage",
     "version:bump": "node scripts/release-version.mjs",
     "version:check": "node scripts/release-version.mjs --check",
-    "test:release": "node --test tests/ReleaseAutomation/version.test.mjs",
+    "test:release": "node --test tests/ReleaseAutomation/version.test.mjs tests/ReleaseAutomation/host-download.test.mjs tests/ReleaseAutomation/qualification.test.mjs",
     "test:ui": "playwright test"
   },
   "devDependencies": {

@@ -6,15 +6,27 @@ on:
       release_tag:
         type: string
         required: true
+      qualification_run_id:
+        type: string
+        default: ''
+      verify_only:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Public GitHub release tag, for example v0.1.2
+        description: Public GitHub release tag, for example v0.1.6
         type: string
         required: true
 
+      verify_only:
+        description: Verify successful tests and the exact VSIX without publishing
+        type: boolean
+        default: false
+
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: marketplace-${{ inputs.release_tag }}
@@ -27,9 +39,11 @@ jobs:
     environment: marketplace
     permissions:
       contents: read
+      actions: read
       id-token: write
     env:
       RELEASE_TAG: ${{ inputs.release_tag }}
+      QUALIFICATION_RUN_ID: ${{ inputs.qualification_run_id }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -48,6 +62,7 @@ jobs:
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease > "$RUNNER_TEMP/release.json"
           node -e 'const r=require(process.env.RUNNER_TEMP+"/release.json"); if(r.tagName!==process.env.RELEASE_TAG||r.isDraft||r.isPrerelease) throw Error("Only a verified public stable release can be published");'
       - name: Require publisher authentication
+        if: ${{ !inputs.verify_only }}
         id: auth
         env:
           CLIENT_ID: ${{ vars.MARKETPLACE_AZURE_CLIENT_ID }}
@@ -80,15 +95,21 @@ jobs:
           unzip -p "$VSIX" extension/package.json > "$RUNNER_TEMP/vsix-manifest.json"
           node -e 'const p=require(process.env.RUNNER_TEMP+"/vsix-manifest.json"); if(p.version!==process.env.RELEASE_TAG.slice(1)||p.publisher!=="managedcode"||p.name!=="managedcode-nuget-package-manager"||p.displayName!=="NuGet Package Manager by ManagedCode") throw Error("Released VSIX identity/display name/version mismatch");'
           echo "path=$VSIX" >> "$GITHUB_OUTPUT"
+      - name: Require successful tests and exact artifact provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/qualified-release.mjs
       - run: npm ci --ignore-scripts
+        if: ${{ !inputs.verify_only }}
       - name: Sign in with the federated Marketplace identity
-        if: steps.auth.outputs.mode == 'oidc'
+        if: ${{ !inputs.verify_only && steps.auth.outputs.mode == 'oidc' }}
         uses: azure/login@v3.1.0
         with:
           client-id: ${{ vars.MARKETPLACE_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.MARKETPLACE_AZURE_TENANT_ID }}
           allow-no-subscriptions: true
       - name: Publish the verified VSIX
+        if: ${{ !inputs.verify_only }}
         env:
           AUTH_MODE: ${{ steps.auth.outputs.mode }}
           VSIX: ${{ steps.asset.outputs.path }}

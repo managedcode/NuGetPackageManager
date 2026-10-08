@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
-import { runTests } from '@vscode/test-electron';
+import { downloadAndUnzipVSCode, runTests } from '@vscode/test-electron';
+import { resolveHostExecutable } from './host-download.mjs';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -98,9 +99,14 @@ try {
     outfile: testBundle,
   });
 
-  await runTests({
-    vscodeExecutablePath: process.env.VSCODE_EXECUTABLE_PATH,
+  const vscodeExecutablePath = await resolveHostExecutable({
+    executablePath: process.env.VSCODE_EXECUTABLE_PATH,
     version: process.env.VSCODE_TEST_VERSION ?? '1.100.0',
+    download: downloadAndUnzipVSCode,
+  });
+  // Assertions run exactly once. Setup retries must never conceal a failing test.
+  await runTests({
+    vscodeExecutablePath,
     extensionDevelopmentPath: extensionRoot,
     extensionTestsPath: testBundle,
     launchArgs: [
