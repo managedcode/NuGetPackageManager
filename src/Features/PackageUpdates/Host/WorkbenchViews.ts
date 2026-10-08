@@ -2,12 +2,16 @@ import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
 import { getHtml } from './html';
 
+const sidebarId = 'nugetPackageManager.sidebar';
+
 /** Native surfaces share the controller's state and validated message handler. */
 export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Disposable {
   sidebar?: vscode.WebviewView;
   panel?: vscode.WebviewPanel;
   private readonly previews = new Map<string, string>();
   private readonly registrations: vscode.Disposable[] = [];
+  private badge?: vscode.ViewBadge;
+  private finishProgress?: () => void;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -15,7 +19,7 @@ export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Dispos
     private readonly onLastSurfaceClosed: () => void,
   ) {
     this.registrations.push(
-      vscode.window.registerWebviewViewProvider('nugetPackageManager.sidebar', this, {
+      vscode.window.registerWebviewViewProvider(sidebarId, this, {
         webviewOptions: { retainContextWhenHidden: true },
       }),
       vscode.workspace.registerTextDocumentContentProvider('nuget-package-manager-preview', {
@@ -26,6 +30,7 @@ export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Dispos
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this.sidebar = view;
+    view.badge = this.badge;
     view.webview.options = {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')],
@@ -48,7 +53,7 @@ export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Dispos
   }
 
   async open(): Promise<void> {
-    await vscode.commands.executeCommand('nugetPackageManager.sidebar.focus');
+    await vscode.commands.executeCommand(`${sidebarId}.focus`);
   }
 
   openEditor(): void {
@@ -90,6 +95,29 @@ export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Dispos
     if (this.panel?.visible) void this.panel.webview.postMessage(message);
   }
 
+  visible(): boolean {
+    return !!(this.sidebar?.visible || this.panel?.visible);
+  }
+
+  /** Native chrome: the Activity Bar badge keeps the last settled count while busy; the view shows progress. */
+  status(updates: number, busy: boolean): void {
+    if (!busy) {
+      this.badge = updates
+        ? { value: updates, tooltip: `${updates} package${updates === 1 ? '' : 's'} with updates` }
+        : undefined;
+      if (this.sidebar) this.sidebar.badge = this.badge;
+    }
+    if (busy && !this.finishProgress) {
+      const done = new Promise<void>((resolve) => {
+        this.finishProgress = resolve;
+      });
+      void vscode.window.withProgress({ location: { viewId: sidebarId } }, () => done);
+    } else if (!busy && this.finishProgress) {
+      this.finishProgress();
+      this.finishProgress = undefined;
+    }
+  }
+
   clearPreviews(): void {
     this.previews.clear();
   }
@@ -108,6 +136,8 @@ export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Dispos
   }
 
   dispose(): void {
+    this.finishProgress?.();
+    this.finishProgress = undefined;
     this.registrations.splice(0).forEach((registration) => registration.dispose());
     this.sidebar = undefined;
     this.panel?.dispose();

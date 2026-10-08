@@ -1,20 +1,31 @@
 import * as vscode from 'vscode';
-import type { Feed, PlannedChange, Policy, ViewState } from '../Contracts/types';
-import { mapConcurrent, validateFeedUrl } from './nuget';
+import type { Activity, Feed, PlannedChange, Policy, ViewState } from '../Contracts/types';
+import { mapConcurrent } from './nuget';
 import { EngineClient } from './engine';
 import { scanWorkspace } from './workspace';
 import { WorkbenchViews } from './WorkbenchViews';
+import { routeMessage, type MessageTarget } from './messages';
+import { readAutoCheck, readFeeds } from './settings';
+import { VersionCache } from './versionCache';
+import { watchWorkspace } from './events';
+import { openPackagePage, revealDeclaration } from './navigation';
 
-export class Workbench implements vscode.Disposable {
+/** Automatic checks may reuse cached listed versions; explicit checks always query the feeds. */
+type CheckMode = 'cached' | 'fresh';
+const recheckDelayMs = 800;
+
+export class Workbench implements MessageTarget, vscode.Disposable {
   private readonly views: WorkbenchViews;
   private readonly client: EngineClient;
   private readonly allVersions = new Map<string, string[]>();
+  private readonly cache = new VersionCache();
   private abort?: AbortController;
   private generation = 0;
   private scanning = false;
-  private checkAfterScan = false;
+  private checkAfterScan?: CheckMode;
   private needsScan = true;
   private applying = false;
+  private recheckTimer?: ReturnType<typeof setTimeout>;
   private snapshots = new Map<string, string>();
   private sourceSnapshots = new Map<string, string>();
   private readonly output = vscode.window.createOutputChannel('NuGet Package Manager');
@@ -26,6 +37,7 @@ export class Workbench implements vscode.Disposable {
     busy: false,
     progress: 0,
     trusted: vscode.workspace.isTrusted,
+    autoCheck: readAutoCheck(),
     policy: 'latest',
     prerelease: false,
   };
@@ -39,48 +51,21 @@ export class Workbench implements vscode.Disposable {
       (message) => {
         void this.message(message).catch((error) => this.report(error));
       },
-      () => this.abort?.abort(),
+      () => this.cancel(),
     );
-    context.subscriptions.push(this.output);
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      '**/{Directory.Packages.props,*.csproj,*.fsproj,*.vbproj}',
-    );
-    const invalidate = () => {
-      if (this.applying) return;
-      this.abort?.abort();
-      this.generation++;
-      this.needsScan = true;
-      this.state.busy = false;
-      this.state.plan = undefined;
-      this.snapshots.clear();
-      this.state.checkedAt = undefined;
-      this.allVersions.clear();
-      this.state.rows = this.state.rows.map((row) => ({
-        ...row,
-        status: 'unchecked',
-        target: undefined,
-        updateKind: undefined,
-        versions: [],
-        error: undefined,
-      }));
-      this.emit();
-    };
     context.subscriptions.push(
-      watcher,
-      watcher.onDidChange(invalidate),
-      watcher.onDidCreate(invalidate),
-      watcher.onDidDelete(invalidate),
-      vscode.workspace.onDidChangeTextDocument((event) => {
-        if (this.state.files.some((f) => f.uri === event.document.uri.toString())) invalidate();
-      }),
-      vscode.workspace.onDidGrantWorkspaceTrust(() => {
-        this.state.trusted = true;
-        this.emit();
-      }),
-      vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('nugetPackageManager')) {
-          invalidate();
-        }
+      this.output,
+      ...watchWorkspace({
+        invalidate: () => this.invalidate(),
+        tracks: (uri) => this.state.files.some((file) => file.uri === uri),
+        trustGranted: () => {
+          this.state.trusted = true;
+          this.emit();
+        },
+        autoCheckChanged: () => {
+          this.state.autoCheck = readAutoCheck();
+          this.emit();
+        },
       }),
     );
   }
@@ -97,20 +82,33 @@ export class Workbench implements vscode.Disposable {
     this.views.openEditor();
   }
 
-  async refresh(check = false, retry = true): Promise<void> {
+  async ready(): Promise<void> {
+    if (this.needsScan) await this.rescan();
+    else this.emit();
+  }
+
+  /** Rediscover declarations; with automatic checks enabled, recheck from cached listed versions. */
+  rescan(): Promise<void> {
+    return this.refresh(this.state.autoCheck ? 'cached' : false);
+  }
+
+  async refresh(check: boolean | CheckMode = false, retry = true): Promise<void> {
     if (this.applying) return;
-    this.checkAfterScan ||= check;
+    const mode: CheckMode | undefined = check === true ? 'fresh' : check || undefined;
+    if (mode && this.checkAfterScan !== 'fresh') this.checkAfterScan = mode;
     if (this.scanning) return;
+    this.cancelRecheck();
     this.scanning = true;
     this.abort?.abort();
     const generation = ++this.generation;
-    this.state.busy = true;
+    this.begin('scan');
     this.state.progress = 0;
     this.state.plan = undefined;
     this.state.checkedAt = undefined;
     this.snapshots.clear();
     this.emit();
     let changedDuringScan = false;
+    let continued = false;
     try {
       const scan = await scanWorkspace(this.client);
       if (generation !== this.generation) changedDuringScan = true;
@@ -119,43 +117,58 @@ export class Workbench implements vscode.Disposable {
         this.sourceSnapshots = snapshots;
         Object.assign(this.state, view);
         this.needsScan = false;
-        this.state.feeds = this.readFeeds();
+        this.state.feeds = readFeeds();
+        // An automatic check is dropped if automatic checks were turned off during the scan.
+        if (this.checkAfterScan === 'cached' && !this.state.autoCheck) this.checkAfterScan = undefined;
+        continued = !!this.checkAfterScan && this.state.rows.length > 0;
       }
     } finally {
       this.scanning = false;
-      this.state.busy = false;
-      this.emit();
+      // A requested check continues at once, so no idle all-unchecked state is published in between.
+      if (!continued) {
+        this.end();
+        this.emit();
+      }
     }
+    const requested = this.checkAfterScan;
+    this.checkAfterScan = undefined;
     if (changedDuringScan) {
-      const requested = this.checkAfterScan;
-      this.checkAfterScan = false;
-      if (requested && retry) await this.refresh(true, false);
+      if (requested && retry) await this.refresh(requested, false);
       else {
         this.state.notices.push('Package files changed while scanning. Run Check for updates again.');
         this.emit();
       }
       return;
     }
-    if (this.checkAfterScan) {
-      this.checkAfterScan = false;
-      await this.check();
-    }
+    if (continued) await this.runCheck(requested === 'fresh');
   }
 
-  async check(): Promise<void> {
+  async check(fresh = true): Promise<void> {
     if (this.state.busy || this.scanning || this.applying) return;
     if (this.needsScan) {
-      await this.refresh(true);
+      await this.refresh(fresh ? 'fresh' : 'cached');
       return;
     }
     if (!this.state.rows.length) return;
-    this.state.feeds = this.readFeeds();
+    await this.runCheck(fresh);
+  }
+
+  private async runCheck(fresh: boolean): Promise<void> {
+    this.cancelRecheck();
+    let feeds: Feed[];
+    try {
+      feeds = this.state.feeds = readFeeds();
+    } catch (error) {
+      this.end();
+      this.emit();
+      throw error;
+    }
     this.abort?.abort();
     const abort = new AbortController();
     this.abort = abort;
     const generation = ++this.generation;
     this.allVersions.clear();
-    this.state.busy = true;
+    this.begin('check');
     this.state.plan = undefined;
     this.state.checkedAt = undefined;
     this.state.progress = 0;
@@ -167,6 +180,7 @@ export class Workbench implements vscode.Disposable {
     });
     const ids = [...new Set(this.state.rows.map((row) => row.packageId.toLowerCase()))];
     let complete = 0;
+    let oldest = Date.now();
     this.emit();
     try {
       await mapConcurrent(
@@ -176,7 +190,11 @@ export class Workbench implements vscode.Disposable {
           let versions: string[] = [];
           let error: string | undefined;
           try {
-            versions = await this.client.getVersions(id, this.state.feeds, abort.signal);
+            const found = await this.cache.lookup(id, feeds, fresh, () =>
+              this.client.getVersions(id, feeds, abort.signal),
+            );
+            versions = found.versions;
+            oldest = Math.min(oldest, found.at);
           } catch (exception) {
             if (abort.signal.aborted) return;
             error = exception instanceof Error ? exception.message : 'Could not check package';
@@ -194,12 +212,13 @@ export class Workbench implements vscode.Disposable {
         },
         abort.signal,
       );
-      if (!abort.signal.aborted && generation === this.generation) this.state.checkedAt = new Date().toISOString();
+      if (!abort.signal.aborted && generation === this.generation)
+        this.state.checkedAt = new Date(oldest).toISOString();
     } catch (error) {
       if (!abort.signal.aborted) throw error;
     } finally {
       if (generation === this.generation) {
-        this.state.busy = false;
+        this.end();
         this.state.rows
           .filter((row) => row.status === 'checking')
           .forEach((row) => {
@@ -207,6 +226,15 @@ export class Workbench implements vscode.Disposable {
           });
         this.emit();
       }
+    }
+  }
+
+  cancel(): void {
+    this.checkAfterScan = undefined;
+    this.abort?.abort();
+    if (this.recheckTimer) {
+      this.cancelRecheck();
+      this.emit();
     }
   }
 
@@ -231,6 +259,67 @@ export class Workbench implements vscode.Disposable {
     row.status = row.target ? 'update' : 'current';
   }
 
+  async setPolicy(policy: Policy, prerelease: boolean): Promise<void> {
+    if (this.state.busy || this.applying) return;
+    this.state.policy = policy;
+    this.state.prerelease = prerelease;
+    this.state.plan = undefined;
+    const abort = new AbortController();
+    this.abort = abort;
+    const generation = ++this.generation;
+    this.begin('resolve');
+    this.emit();
+    const pending = this.state.rows.filter((row) => ['current', 'update'].includes(row.status));
+    pending.forEach((row) => {
+      row.status = 'checking';
+      row.target = undefined;
+      row.updateKind = undefined;
+      row.versions = [];
+    });
+    try {
+      await mapConcurrent(pending, 6, (row) => this.resolveTarget(row, abort.signal), abort.signal);
+    } catch (error) {
+      if (!abort.signal.aborted) throw error;
+    } finally {
+      if (generation === this.generation) {
+        this.state.rows
+          .filter((row) => row.status === 'checking')
+          .forEach((row) => {
+            row.status = 'unchecked';
+          });
+        this.end();
+        this.emit();
+      }
+    }
+  }
+
+  async setTarget(key: string, version: string): Promise<void> {
+    if (this.state.busy || this.applying) return;
+    const row = this.state.rows.find((row) => row.key === key);
+    if (!row || !['current', 'update'].includes(row.status) || !row.versions.includes(version)) return;
+    const generation = this.generation;
+    this.begin('resolve');
+    this.emit();
+    try {
+      const resolution = await this.client.resolve(row.version, [version], this.state.policy, this.state.prerelease);
+      if (
+        generation !== this.generation ||
+        resolution.target !== version ||
+        !['current', 'update'].includes(row.status)
+      )
+        return;
+      row.target = version;
+      row.updateKind = resolution.updateKind;
+      row.status = 'update';
+      this.state.plan = undefined;
+    } finally {
+      if (generation === this.generation) {
+        this.end();
+        this.emit();
+      }
+    }
+  }
+
   async review(keys: unknown): Promise<void> {
     if (!Array.isArray(keys) || keys.some((key) => typeof key !== 'string') || this.state.busy || this.applying) return;
     if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace to update package files.');
@@ -244,7 +333,7 @@ export class Workbench implements vscode.Disposable {
     this.state.plan = undefined;
     this.snapshots.clear();
     this.views.clearPreviews();
-    this.state.busy = true;
+    this.begin('review');
     this.emit();
     const generation = this.generation;
     try {
@@ -277,13 +366,19 @@ export class Workbench implements vscode.Disposable {
       this.state.plan = plan;
     } finally {
       if (generation === this.generation) {
-        this.state.busy = false;
+        this.end();
         this.emit();
       }
     }
   }
 
-  private async preview(file: unknown): Promise<void> {
+  back(): void {
+    if (this.applying) return;
+    this.state.plan = undefined;
+    this.emit();
+  }
+
+  async preview(file: string): Promise<void> {
     if (typeof file !== 'string' || !this.state.plan?.some((change) => change.file === file)) return;
     const text = this.snapshots.get(file);
     if (text === undefined) return;
@@ -299,7 +394,7 @@ export class Workbench implements vscode.Disposable {
   async apply(): Promise<void> {
     if (!vscode.workspace.isTrusted || !this.state.plan?.length || this.applying || this.state.busy) return;
     this.applying = true;
-    this.state.busy = true;
+    this.begin('apply');
     this.emit();
     const plan = this.state.plan;
     try {
@@ -349,167 +444,98 @@ export class Workbench implements vscode.Disposable {
       );
     } finally {
       this.applying = false;
-      this.state.busy = false;
+      this.end();
       this.emit();
     }
-    await this.refresh();
+    await this.rescan();
   }
 
-  private async message(raw: unknown): Promise<void> {
-    if (!raw || typeof raw !== 'object') return;
-    const message = raw as Record<string, unknown>;
-    switch (message.type) {
-      case 'ready':
-        if (this.needsScan) await this.refresh();
-        else this.emit();
-        break;
-      case 'refresh':
-        await this.refresh(true);
-        break;
-      case 'check':
-        await this.check();
-        break;
-      case 'cancel':
-        this.abort?.abort();
-        break;
-      case 'policy':
-        if (this.state.busy || this.applying) break;
-        if (['latest', 'minor', 'patch'].includes(String(message.policy)) && typeof message.prerelease === 'boolean') {
-          this.state.policy = message.policy as Policy;
-          this.state.prerelease = message.prerelease;
-          this.state.plan = undefined;
-          const abort = new AbortController();
-          this.abort = abort;
-          const generation = ++this.generation;
-          this.state.busy = true;
-          this.emit();
-          const pending = this.state.rows.filter((row) => ['current', 'update'].includes(row.status));
-          pending.forEach((row) => {
-            row.status = 'checking';
-            row.target = undefined;
-            row.updateKind = undefined;
-            row.versions = [];
-          });
-          try {
-            await mapConcurrent(pending, 6, (row) => this.resolveTarget(row, abort.signal), abort.signal);
-          } catch (error) {
-            if (!abort.signal.aborted) throw error;
-          } finally {
-            if (generation === this.generation) {
-              this.state.rows
-                .filter((row) => row.status === 'checking')
-                .forEach((row) => {
-                  row.status = 'unchecked';
-                });
-              this.state.busy = false;
-              this.emit();
-            }
-          }
-        }
-        break;
-      case 'target': {
-        if (this.state.busy || this.applying) break;
-        const row = this.state.rows.find((row) => row.key === message.key);
-        if (
-          row &&
-          ['current', 'update'].includes(row.status) &&
-          typeof message.version === 'string' &&
-          row.versions.includes(message.version)
-        ) {
-          const generation = this.generation;
-          this.state.busy = true;
-          this.emit();
-          try {
-            const resolution = await this.client.resolve(
-              row.version,
-              [message.version],
-              this.state.policy,
-              this.state.prerelease,
-            );
-            if (
-              generation !== this.generation ||
-              resolution.target !== message.version ||
-              !['current', 'update'].includes(row.status)
-            )
-              break;
-            row.target = message.version;
-            row.updateKind = resolution.updateKind;
-            row.status = 'update';
-            this.state.plan = undefined;
-          } finally {
-            if (generation === this.generation) {
-              this.state.busy = false;
-              this.emit();
-            }
-          }
-        }
-        break;
-      }
-      case 'review':
-        await this.review(message.keys);
-        break;
-      case 'back':
-        if (!this.applying) {
-          this.state.plan = undefined;
-          this.emit();
-        }
-        break;
-      case 'preview':
-        await this.preview(message.file);
-        break;
-      case 'apply':
-        await this.apply();
-        break;
-      case 'openFile': {
-        const row = this.state.rows.find((row) => row.key === message.key);
-        if (row) {
-          const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(row.file));
-          await vscode.window.showTextDocument(document, {
-            selection: new vscode.Range(document.positionAt(row.start), document.positionAt(row.end)),
-          });
-        }
-        break;
-      }
-      case 'packageLink': {
-        const row = this.state.rows.find((row) => row.key === message.key);
-        if (row)
-          await vscode.env.openExternal(
-            vscode.Uri.parse(`https://www.nuget.org/packages/${encodeURIComponent(row.packageId)}`),
-          );
-        break;
-      }
-      case 'settings':
-        await vscode.commands.executeCommand(
-          'workbench.action.openSettings',
-          '@ext:managedcode.managedcode-nuget-package-manager',
-        );
-        break;
+  async openDeclaration(key: string): Promise<void> {
+    const row = this.state.rows.find((row) => row.key === key);
+    if (row) await revealDeclaration(row);
+  }
+
+  async openPackagePage(key: string): Promise<void> {
+    const row = this.state.rows.find((row) => row.key === key);
+    if (row) await openPackagePage(row.packageId);
+  }
+
+  private message(raw: unknown): Promise<void> {
+    return routeMessage(this, raw);
+  }
+
+  private invalidate(): void {
+    if (this.applying) return;
+    this.abort?.abort();
+    this.generation++;
+    this.needsScan = true;
+    this.end();
+    this.state.plan = undefined;
+    this.snapshots.clear();
+    this.state.checkedAt = undefined;
+    this.allVersions.clear();
+    this.state.rows = this.state.rows.map((row) => ({
+      ...row,
+      status: 'unchecked',
+      target: undefined,
+      updateKind: undefined,
+      versions: [],
+      error: undefined,
+    }));
+    this.scheduleRecheck();
+    this.emit();
+  }
+
+  /** Package files changed: a visible surface rescans and rechecks from cached versions once edits settle. */
+  private scheduleRecheck(): void {
+    clearTimeout(this.recheckTimer);
+    this.state.recheckPending = this.state.autoCheck && this.views.visible();
+    if (!this.state.recheckPending) {
+      this.recheckTimer = undefined;
+      return;
     }
+    this.recheckTimer = setTimeout(() => {
+      this.recheckTimer = undefined;
+      this.state.recheckPending = false;
+      if (this.applying || this.state.plan || !this.needsScan || !this.state.autoCheck || !this.views.visible())
+        this.emit();
+      else void this.refresh('cached').catch((error) => this.report(error));
+    }, recheckDelayMs);
+  }
+
+  private cancelRecheck(): void {
+    clearTimeout(this.recheckTimer);
+    this.recheckTimer = undefined;
+    this.state.recheckPending = false;
+  }
+
+  private begin(activity: Activity): void {
+    this.state.busy = true;
+    this.state.activity = activity;
+  }
+
+  private end(): void {
+    this.state.busy = false;
+    this.state.activity = undefined;
   }
 
   private emit(): void {
     this.views.post({ type: 'state', state: this.getState() });
+    const updates = new Set(
+      this.state.rows.filter((row) => row.status === 'update').map((row) => row.packageId.toLowerCase()),
+    );
+    this.views.status(updates.size, this.state.busy || !!this.state.recheckPending);
   }
-  private readFeeds(): Feed[] {
-    const feeds = vscode.workspace
-      .getConfiguration('nugetPackageManager')
-      .get<Feed[]>('feeds', [{ name: 'nuget.org', url: 'https://api.nuget.org/v3/index.json' }]);
-    if (
-      !Array.isArray(feeds) ||
-      !feeds.length ||
-      feeds.some((feed) => typeof feed?.name !== 'string' || !feed.name.trim() || typeof feed.url !== 'string')
-    )
-      throw new Error('Configure at least one NuGet V3 feed in nugetPackageManager.feeds.');
-    feeds.forEach((feed) => validateFeedUrl(feed.url));
-    return feeds;
-  }
+
   private report(error: unknown): void {
     const message = error instanceof Error ? error.message : 'NuGet operation failed';
     this.output.appendLine(message);
     this.views.post({ type: 'error', message });
     void vscode.window.showErrorMessage(message);
   }
+
   dispose(): void {
+    this.cancelRecheck();
     this.abort?.abort();
     this.views.dispose();
   }

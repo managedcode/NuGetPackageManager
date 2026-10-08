@@ -52,7 +52,7 @@ See `nuget-manager --help` for the installed tool's current usage. Version 0.1.1
 
 ## UI preview and npm scripts
 
-For the standalone UI preview, run `npm run preview` and open the local URL printed in the terminal. Its bridge is simulated and does not read or write workspace files; it is for illustrative layout inspection only.
+For the standalone UI preview, run `npm run preview` and open the local URL printed in the terminal. The preview emulates VS Code's injected webview defaults and theme tokens. Pass query parameters to inspect layout and state: `theme=light-plus|light-modern|dark-modern|hc-black` for light/dark/high-contrast themes, `surface=sidebar|editor` for layout, and `scenario=checking|unchecked|untrusted|nofolder|empty` for package states. The simulated host does not read or write workspace files; it is for illustrative inspection only.
 
 | Command                | Purpose                                    |
 | ---------------------- | ------------------------------------------ |

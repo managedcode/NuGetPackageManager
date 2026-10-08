@@ -17,7 +17,6 @@ tsconfig.json
 package-lock.json
 AGENTS.md
 CLAUDE.md
-bootstrap.*.md
 docs/**
 dist/*.map
 **/*.log
@@ -26,5 +25,8 @@ dist/*.map
 
 **/*.pdb
 
-release-automation.*.md
-sidebar-workbench.*.md
+media/screenshots/**
+.prettierignore
+*.brainstorm.md
+*.acceptance.md
+*.plan.md

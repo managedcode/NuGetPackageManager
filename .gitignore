@@ -14,3 +14,38 @@ TestResults/
 
 .release-version.lock
 *.release-version-*.tmp
+
+# Coverage and caches
+coverage/
+.nyc_output/
+.cache/
+
+# Local IDE files
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Generated packages and temporary files
+*.nupkg
+*.snupkg
+*.tmp
+*.swp
+*.swo
+*~
+/work/
+/tmp/
+/.tmp/
+
+# Temporary root planning notes stay local
+/*.brainstorm.md
+/*.acceptance.md
+/*.plan.md

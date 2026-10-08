@@ -18,7 +18,7 @@ Safety contracts: read actual editor buffers, record full snapshots at discovery
 
 NuGet metadata contract: flat-container versions must be cross-checked against listed registration catalog entries. A feed missing required metadata or returning an error is explicitly unsupported/failed; no partial success is presented as a complete check.
 
-Implementation stages and owners: TASK-001 lead moves the slice and implements contracts; TASK-002 worker adds real HTTP/host tests and CI; TASK-003 docs worker describes supported behavior; TASK-004 independent reviewer checks safety. Ordered dependencies, exact ownership, commands and join gates are in bootstrap.plan.md.
+Implementation stages and owners: TASK-001 lead moves the slice and implements contracts; TASK-002 worker adds real HTTP/host tests and CI; TASK-003 docs worker describes supported behavior; TASK-004 independent reviewer checks safety. The durable feature contract and testing documentation define required behavior and checks.
 
 Rollout: v0.1 GitHub VSIX for manual installation, backed by CI. No Marketplace publish without a configured publisher credential. Rollback: uninstall the VSIX; editor undo or source-control revert restores applied version changes. No data migration or remote state.
 

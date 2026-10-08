@@ -14,7 +14,7 @@ The browser preview uses a simulated bridge and sample data; it cannot prove eng
 
 ## Pull requests
 
-Describe the user-visible behavior and the evidence you ran. Include the relevant AC identifier from [the acceptance contract](bootstrap.acceptance.md) when the change implements or alters an acceptance condition. Report failures and unverified areas directly.
+Describe the user-visible behavior and the evidence you ran. Include the relevant AC identifier from [the feature contract](docs/Features/PackageUpdates.md) when the change implements or alters an acceptance condition. Report failures and unverified areas directly.
 
 ## License
 

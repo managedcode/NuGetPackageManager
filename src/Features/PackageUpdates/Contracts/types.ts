@@ -46,15 +46,23 @@ export interface PlannedChange {
   condition?: string;
 }
 
+/** What the host is doing while busy, so the renderer can describe it precisely. */
+export type Activity = 'scan' | 'check' | 'resolve' | 'review' | 'apply';
+
 export interface ViewState {
   rows: PackageRow[];
   files: { uri: string; label: string; count: number }[];
   notices: string[];
   feeds: Feed[];
   busy: boolean;
+  activity?: Activity;
   progress: number;
+  /** Oldest feed data used by the latest complete check. */
   checkedAt?: string;
   trusted: boolean;
+  autoCheck: boolean;
+  /** An automatic rescan and check is scheduled after package files changed. */
+  recheckPending?: boolean;
   policy: Policy;
   prerelease: boolean;
   plan?: PlannedChange[];

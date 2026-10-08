@@ -16,6 +16,8 @@ const manifest = JSON.parse(
   await (await import('node:fs/promises')).readFile(path.join(extensionRoot, 'package.json'), 'utf8'),
 );
 process.env.NUGET_WORKBENCH_EXTENSION_ID = `${manifest.publisher}.${manifest.name}`;
+// A terminal inside VS Code exports this; it would make the launched editor run as plain Node.
+delete process.env.ELECTRON_RUN_AS_NODE;
 
 try {
   execFileSync(process.execPath, [path.join(extensionRoot, 'scripts/build.mjs')], {
@@ -52,6 +54,12 @@ try {
         '    <PackageReference Include="Policy.Package" Version="1.0.0" />',
         '    <PackageReference Include="Microsoft.Orleans.Core" Version="1.0.0" />',
         '    <PackageReference Include="Microsoft.Orleans.Hosting" Version="1.0.0" />',
+        // Applied by the automatic-check host scenarios: Automatic (saved Apply), Buffered (Apply into an unsaved buffer)
+        // and Manual (Apply with autoCheck disabled). The feed answers HTTP 500 for Failing.Package's registration.
+        '    <PackageReference Include="Automatic.Package" Version="1.0.0" />',
+        '    <PackageReference Include="Buffered.Package" Version="1.0.0" />',
+        '    <PackageReference Include="Manual.Package" Version="1.0.0" />',
+        '    <PackageReference Include="Failing.Package" Version="1.0.0" />',
         '  </ItemGroup>',
         '</Project>',
         '',

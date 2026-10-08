@@ -1,272 +1,432 @@
 /* The webview only renders state; file and network access stay in the extension host. */
 (() => {
   const vscode = acquireVsCodeApi();
-  const remembered = vscode.getState() || {};
+  const { patch } = globalThis.NuGetDom;
+  const model = globalThis.NuGetModel;
+  const view = globalThis.NuGetView;
+  const root = document.getElementById('app');
+  const surface = document.body.classList.contains('surface-sidebar') ? 'sidebar' : 'editor';
+  const narrow = window.matchMedia('(width < 780px)');
+  const saved = vscode.getState() || {};
+  const text = (value) => (typeof value === 'string' ? value : '');
+  const list = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []);
+  const lower = (value) => String(value ?? '').toLowerCase();
+  const packageId = (row) => `p:${lower(row.packageId)}`;
+  const kindOf = (row) => (['major', 'minor', 'patch'].includes(row.updateKind) ? row.updateKind : 'other');
+  const send = (type, data = {}) => vscode.postMessage({ type, ...data });
+
   let state = {
     rows: [],
     files: [],
     notices: [],
     feeds: [],
-    busy: false,
+    busy: true,
+    activity: 'scan',
     progress: 0,
     trusted: true,
+    autoCheck: true,
     policy: 'latest',
     prerelease: false,
   };
-  let detailOpen = false;
-  let selected = new Set(remembered.selected || []);
-  let query = remembered.query || '';
-  let group = remembered.group || '';
-  let file = remembered.file || '';
-  let tab = remembered.tab || 'updates';
-  let kind = remembered.kind || '';
-  let activeKey = remembered.activeKey || '';
-  let toast = '';
-  const app = document.getElementById('app');
-  const esc = (value) =>
-    String(value ?? '').replace(
-      /[&<>"']/g,
-      (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[x],
-    );
-  const send = (type, data = {}) => vscode.postMessage({ type, ...data });
-  const icons = {
-    nuget:
-      '<g fill="currentColor" stroke="none" transform="translate(1 0.8) scale(0.82)"><circle cx="3.65" cy="4.06" r="2.75"/><path d="M19.52,5.65H12.84A6.91,6.91,0,0,0,5.9,12.57v6.68a6.91,6.91,0,0,0,6.91,6.91h6.68a6.91,6.91,0,0,0,6.91-6.92V12.57A6.91,6.91,0,0,0,19.52,5.65Zm-6.75,7.47A2,2,0,1,1,13,10.6,2,2,0,0,1,12.77,13.12Zm6.63,9.69a3.5,3.5,0,1,1,3.5-3.5A3.5,3.5,0,0,1,19.4,22.81Z"/></g>',
-    refresh: '<path d="M20 7v5h-5M4 17v-5h5M6.2 6.5A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.8 5.5"/>',
-    search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
-    arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
-    check: '<path d="m5 12 4 4L19 6"/>',
-    file: '<path d="M14 3H6v18h12V7l-4-4Z"/><path d="M14 3v5h4M9 12h6M9 16h6"/>',
-    external: '<path d="M14 3h7v7m0-7L10 14M10 5H4v15h15v-6"/>',
-    settings: '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',
-    back: '<path d="M19 12H5m6-6-6 6 6 6"/>',
-    warning: '<path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3v1"/>',
+  const ui = {
+    view: saved.view === 'list' ? 'list' : 'groups',
+    query: text(saved.query),
+    group: text(saved.group),
+    file: text(saved.file),
+    kinds: new Set(list(saved.kinds)),
+    showAll: saved.showAll === true,
+    selected: new Set(list(saved.selected)),
+    open: new Set(list(saved.open)),
+    closed: new Set(list(saved.closed)),
+    expanded: new Set(list(saved.expanded)),
+    activeId: text(saved.activeId),
+    cursor: text(saved.cursor),
+    options: false,
+    drawer: false,
+    toast: '',
+    failuresOpen: false,
+    notesOpen: false,
   };
-  const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.nuget}</svg>`;
-  const disabled = (yes) => (yes ? 'disabled' : '');
-  const updates = () => state.rows.filter((row) => row.status === 'update');
-  const selectedRows = () => state.rows.filter((row) => selected.has(row.key) && row.status === 'update');
-  const inFamily = (row, name) =>
-    !name || (row.families || [row.group]).some((value) => value.toLowerCase() === name.toLowerCase());
-  const familyUpdates = () => state.rows.filter((row) => row.status === 'update' && inFamily(row, group));
-  const visible = () =>
-    state.rows.filter(
-      (row) =>
-        (tab !== 'updates' ||
-          row.status === 'update' ||
-          row.status === 'error' ||
-          row.status === 'unchecked' ||
-          row.status === 'checking') &&
-        inFamily(row, group) &&
-        (!file || row.file === file) &&
-        (!kind || row.updateKind === kind) &&
-        `${row.packageId} ${row.fileLabel}`.toLowerCase().includes(query.toLowerCase()),
-    );
-  const persist = () => vscode.setState({ selected: [...selected], query, group, file, tab, kind, activeKey });
-  const badge = (row) =>
-    row.status === 'update'
-      ? `<span class="badge ${row.updateKind}">${esc(row.updateKind)}</span>`
-      : `<span class="badge ${row.status}">${esc({ current: 'current', error: 'failed', unchecked: 'not checked', checking: 'checking' }[row.status])}</span>`;
+  /** Last settled update per declaration identity, shown dimmed while a recheck is running. */
+  const known = new Map();
+  const identity = (row) => `${row.file}|${lower(row.packageId)}|${row.version}`;
+  let ctx;
+  let scheduled = false;
+  /** Selector focused right after the next render, once the target exists and is visible. */
+  let focusAfter = '';
+  /** Narrow views start with groups collapsed; wide views have room to show them open. */
+  const groupOpen = (id) => (narrow.matches ? ui.open.has(id) : !ui.closed.has(id));
 
-  let rendering = false;
-  let pendingRender = false;
+  function remember() {
+    for (const row of state.rows) {
+      if (row.status === 'update') known.set(identity(row), { target: row.target, updateKind: row.updateKind });
+      else if (row.status === 'current' || row.status === 'error') known.delete(identity(row));
+    }
+  }
+
+  /** Rows the current view can show: updates (plus dimmed previous updates while rechecking) or everything. */
+  function baseRows() {
+    const refreshing = state.busy || !!state.recheckPending;
+    const rows = state.rows.map((row) => {
+      const last = refreshing && (row.status === 'checking' || row.status === 'unchecked') && known.get(identity(row));
+      return last ? { ...row, ...last, pending: true } : row;
+    });
+    return ui.showAll ? rows : rows.filter((row) => row.status === 'update' || row.pending);
+  }
+
+  function derive() {
+    const base = baseRows();
+    const filters = { query: ui.query, file: ui.file, kinds: [...ui.kinds] };
+    const visible = model.filterRows(base, filters);
+    const allGroups = model.groupView(base, visible);
+    const selectedGroup = allGroups.find((group) => group.id === ui.group);
+    const groups = ui.group ? (selectedGroup ? [selectedGroup] : []) : allGroups;
+    const contentRows = groups.flatMap((group) => group.rows);
+    const visibleUpdates = contentRows.filter((row) => row.status === 'update');
+    const visibleKeys = new Set(visibleUpdates.map((row) => row.key));
+    const failures = [];
+    if (!ui.showAll && !ui.group)
+      for (const row of model.filterRows(
+        state.rows.filter((item) => item.status === 'error'),
+        filters,
+      ))
+        if (!failures.some((item) => lower(item.packageId) === lower(row.packageId))) failures.push(row);
+    const files = new Map();
+    for (const row of contentRows) files.set(row.file, (files.get(row.file) ?? 0) + 1);
+    const kindCounts = { major: 0, minor: 0, patch: 0, other: 0 };
+    for (const kind of Object.keys(kindCounts))
+      kindCounts[kind] = new Set(
+        visibleUpdates.filter((row) => kindOf(row) === kind).map((row) => lower(row.packageId)),
+      ).size;
+    const familyNames = new Set();
+    model.walk(model.familyNav(state.rows), (node) => familyNames.add(lower(node.name)));
+    const activeRows = ui.activeId ? state.rows.filter((row) => packageId(row) === ui.activeId) : [];
+    return {
+      state,
+      ui,
+      surface,
+      wide: !narrow.matches,
+      summary: model.summarize(state.rows),
+      allGroups,
+      groups,
+      packages: ui.view === 'list' ? model.packageList(contentRows) : [],
+      groupName: ui.group === 'g:*' ? 'Other packages' : (selectedGroup?.name ?? ui.group.slice(2)),
+      navTotal: model.summarize(visible).packages,
+      visibleUpdates,
+      visibleKeys: [...visibleKeys],
+      selectedRows: visibleUpdates.filter((row) => ui.selected.has(row.key)),
+      hiddenSelected: [...ui.selected].filter((key) => !visibleKeys.has(key)).length,
+      failures,
+      filtered: base.length > 0 && contentRows.length === 0,
+      commonFile: [...files].sort((a, b) => b[1] - a[1])[0]?.[0],
+      kindCounts,
+      familyNames,
+      feedText: state.feeds.map((feed) => feed.name).join(' + ') || 'nuget.org',
+      active: activeRows.length
+        ? {
+            id: ui.activeId,
+            name: activeRows[0].packageId,
+            chain: activeRows[0].families?.length ? activeRows[0].families : [activeRows[0].packageId],
+            rows: activeRows,
+          }
+        : undefined,
+      activeId: ui.activeId,
+      cursor: ui.cursor,
+      isOpen: (group) => !!ui.query.trim() || !!ui.group || groups.length === 1 || groupOpen(group.id),
+    };
+  }
+
   function render() {
-    if (rendering) {
-      pendingRender = true;
-      return;
+    scheduled = false;
+    ctx = derive();
+    patch(root, view.app(ctx));
+    if (focusAfter) {
+      root.querySelector(focusAfter)?.focus();
+      focusAfter = '';
     }
-    rendering = true;
-    try {
-      renderView();
-    } finally {
-      rendering = false;
-      if (pendingRender) {
-        pendingRender = false;
-        queueMicrotask(render);
-      }
-    }
-  }
-  function renderView() {
-    const focused = document.activeElement?.id;
-    const caret = document.activeElement?.selectionStart;
-    const rows = visible();
-    const ready = updates();
-    const picked = selectedRows();
-    const roots = new Set(state.rows.map((row) => row.group.toLowerCase()));
-    const groups = [
-      ...new Map(
-        state.rows.flatMap((row) => row.families || [row.group]).map((name) => [name.toLowerCase(), name]),
-      ).values(),
-    ]
-      .filter((name) => roots.has(name.toLowerCase()) || state.rows.filter((row) => inFamily(row, name)).length >= 2)
-      .sort();
-    const active = rows.find((row) => row.key === activeKey) || rows[0];
-    const unchecked = state.rows.some((row) => row.status === 'unchecked');
-    const failed = state.rows.filter((row) => row.status === 'error').length;
-    app.innerHTML = `<div class="shell">
-      <header class="topbar"><div class="brand"><span class="brand-mark">${icon('nuget')}</span><span>NuGet <strong>Package Manager</strong><small>by ManagedCode</small></span></div><div class="top-actions"><span class="feed-label"><i></i>${esc(state.feeds.map((feed) => feed.name).join(' + ') || 'nuget.org')}</span><button class="icon-button" id="settings" data-action="settings" aria-label="Configure package feeds">${icon('settings')}</button></div></header>
-      <section class="hero"><div><div class="eyebrow">PACKAGE UPDATES</div><h1>Update families together.</h1><p>Choose a family. Review the complete change set.</p></div><button class="primary" data-action="${state.busy ? 'cancel' : 'refresh'}" ${disabled(state.busy && !!state.plan)}>${icon(state.busy ? 'back' : 'refresh')}${state.busy ? 'Cancel check' : 'Check for updates'}</button></section>
-      <div class="summary"><div><span class="metric">${state.rows.length}</span><span>Declarations</span></div><div><span class="metric accent">${ready.length}</span><span>Available updates</span></div><div><span class="metric">${state.files.filter((f) => f.count).length}</span><span>Package files</span></div><div class="scan-status">${state.busy ? `<progress max="100" value="${state.progress}" aria-label="Update check progress"></progress><span>Checking feeds · ${state.progress}%</span>` : `<span class="status-dot"></span><span>${state.checkedAt ? `Checked ${esc(new Date(state.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}` : 'Ready to check'}${failed ? ` · ${failed} failed` : ''}</span>`}</div></div>
-      ${!state.trusted ? `<div class="notice">${icon('warning')} Restricted Mode: trust this workspace to apply package updates.</div>` : ''}
-      ${toast ? `<div class="notice error" role="alert">${icon('warning')}${esc(toast)}<button data-action="dismiss" aria-label="Dismiss message">×</button></div>` : ''}
-      ${
-        state.plan
-          ? renderPlan(state.plan)
-          : `<div class="workbench">
-        <aside class="sidebar"><div class="section-label">PACKAGE FAMILIES</div><button class="family ${!group ? 'active' : ''}" data-group=""><span>All packages</span><span class="count">${ready.length}</span></button>${groups.map((name) => `<button class="family ${group.toLowerCase() === name.toLowerCase() ? 'active' : ''} ${roots.has(name.toLowerCase()) ? '' : 'subfamily'}" title="${esc(name)}" aria-label="${esc(name)} ${ready.filter((row) => inFamily(row, name)).length}" data-group="${esc(name)}"><span class="family-name">${esc(roots.has(name.toLowerCase()) ? name : name.slice(name.indexOf('.') + 1))}</span><span class="count">${ready.filter((row) => inFamily(row, name)).length}</span></button>`).join('')}<button class="primary family-update" data-action="update-family" ${disabled(state.busy || !familyUpdates().length || !state.trusted)}>${icon('arrow')}Review ${familyUpdates().length} ${group ? 'family' : 'all'} updates</button><p class="family-hint">${group ? `${esc(group)} · all files` : 'All families · all files'}</p><div class="sidebar-note">${icon('file')}<span>Central versions and project references, in one place.</span></div></aside>
-        <main class="package-panel"><div class="tabs" role="tablist" aria-label="Package views"><button role="tab" aria-selected="${tab === 'updates'}" class="${tab === 'updates' ? 'active' : ''}" data-tab="updates">Updates <span>${ready.length}</span></button><button role="tab" aria-selected="${tab === 'all'}" class="${tab === 'all' ? 'active' : ''}" data-tab="all">All packages <span>${state.rows.length}</span></button></div>
-          <div class="filters"><label class="search">${icon('search')}<input id="query" type="search" placeholder="Filter packages…" aria-label="Filter packages" value="${esc(query)}"></label><select id="file" aria-label="Package file"><option value="">All package files</option>${state.files
-            .filter((f) => f.count)
-            .map((f) => `<option value="${esc(f.uri)}" ${f.uri === file ? 'selected' : ''}>${esc(f.label)}</option>`)
-            .join('')}</select></div>
-          <div class="policy-bar"><label>Target <select id="policy" aria-label="Update policy" ${disabled(state.busy)}><option value="latest" ${state.policy === 'latest' ? 'selected' : ''}>Latest available</option><option value="minor" ${state.policy === 'minor' ? 'selected' : ''}>Within current major</option><option value="patch" ${state.policy === 'patch' ? 'selected' : ''}>Within current minor</option></select></label><label class="check-label"><input id="prerelease" type="checkbox" ${state.prerelease ? 'checked' : ''} ${disabled(state.busy)}>Include prerelease</label><select id="kind" aria-label="Update type"><option value="">All update types</option>${['patch', 'minor', 'major', 'revision', 'prerelease'].map((value) => `<option value="${value}" ${kind === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
-          <div class="list-toolbar"><label class="check-label"><input id="select-visible" type="checkbox" ${rows.filter((r) => r.status === 'update').length && rows.filter((r) => r.status === 'update').every((r) => selected.has(r.key)) ? 'checked' : ''} ${disabled(state.busy || !rows.some((r) => r.status === 'update'))}>Select visible</label><span>${rows.length} shown</span><button class="text-button" data-action="select-patches" ${disabled(state.busy || !rows.some((r) => r.updateKind === 'patch'))}>Select patches</button></div>
-          <div class="package-list" role="region" aria-label="Package declarations">${rows.length ? rows.map((row) => `<div class="package-row ${active?.key === row.key ? 'focused' : ''} ${selected.has(row.key) ? 'selected' : ''}"><input type="checkbox" data-select="${esc(row.key)}" aria-label="Select ${esc(row.packageId)} in ${esc(row.fileLabel)}" ${selected.has(row.key) ? 'checked' : ''} ${disabled(state.busy || row.status !== 'update')}><button class="package-identity" data-focus="${esc(row.key)}"><span class="package-icon">${esc(row.group.slice(0, 2).toUpperCase())}</span><span class="package-name">${esc(row.packageId)}<small title="${esc(row.fileLabel)}">${esc(row.fileLabel)}${row.condition ? ` · ${esc(row.condition)}` : ''}</small></span></button><div class="version-change"><code>${esc(row.version)}</code><span>→</span><code class="${row.target ? 'target' : ''}">${esc(row.target || (row.status === 'error' ? 'unavailable' : row.status === 'current' ? row.version : '—'))}</code></div>${badge(row)}</div>`).join('') : renderEmpty(unchecked)}</div>
-          <footer class="selection-bar"><div><strong>${picked.length} selected</strong><small>${picked.length ? `${new Set(picked.map((row) => row.file)).size} file${new Set(picked.map((row) => row.file)).size === 1 ? '' : 's'} will change` : 'Choose the updates you want to apply'}</small></div><button class="primary" data-action="review" ${disabled(state.busy || !picked.length || !state.trusted)}>Review changes ${icon('arrow')}</button></footer>
-        </main>${renderDetail(active)}
-      </div>`
-      }
-      ${state.notices.length ? `<details class="scan-notices"><summary>${icon('warning')} ${state.notices.length} scan note${state.notices.length === 1 ? '' : 's'}</summary><ul>${state.notices.map((note) => `<li>${esc(note)}</li>`).join('')}</ul></details>` : ''}
-      <footer class="page-footer"><span>Small, deliberate updates.</span><span>Review → Apply → Restore & test</span></footer>
-    </div>`;
-    if (focused) {
-      const element = document.getElementById(focused);
-      if (element) {
-        element.focus();
-        if (typeof caret === 'number' && element.setSelectionRange) element.setSelectionRange(caret, caret);
-      }
-    }
-    persist();
+    const rows = root.querySelectorAll('.tree [data-nav]');
+    if (rows.length && ![...rows].some((row) => row.tabIndex === 0)) rows[0].tabIndex = 0;
+    vscode.setState({
+      view: ui.view,
+      query: ui.query,
+      group: ui.group,
+      file: ui.file,
+      kinds: [...ui.kinds],
+      showAll: ui.showAll,
+      selected: [...ui.selected],
+      open: [...ui.open],
+      closed: [...ui.closed],
+      expanded: [...ui.expanded],
+      activeId: ui.activeId,
+      cursor: ui.cursor,
+    });
   }
 
-  function renderEmpty(unchecked) {
-    const noPackages = !state.rows.length;
-    return `<div class="empty">${icon(noPackages ? 'cube' : 'check')}<h2>${noPackages ? 'Bring your .NET workspace.' : query || group || file || kind ? 'No matching packages.' : 'Nothing to update here.'}</h2><p>${noPackages ? 'Open a folder containing Directory.Packages.props or .NET project files, then check for updates.' : unchecked ? 'Check the configured feeds to find available versions.' : 'Try another filter, or check all packages for their current status.'}</p><button class="secondary" data-action="${query || group || file || kind ? 'clear-filters' : 'refresh'}" ${disabled(state.busy)}>${query || group || file || kind ? 'Clear filters' : 'Refresh workspace'}</button></div>`;
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(render);
   }
 
-  function renderDetail(row) {
-    if (!row)
-      return `<button class="detail-backdrop ${detailOpen ? 'open' : ''}" data-action="close-detail" aria-label="Close package details"></button><aside class="detail ${detailOpen ? 'open' : ''}"><button class="detail-close secondary" data-action="close-detail">${icon('back')} Back to packages</button><div class="section-label">PACKAGE DETAILS</div><p>Select a package to see its versions and declaration.</p></aside>`;
-    const choices = row.versions.slice().reverse();
-    return `<button class="detail-backdrop ${detailOpen ? 'open' : ''}" data-action="close-detail" aria-label="Close package details"></button><aside class="detail ${detailOpen ? 'open' : ''}"><button class="detail-close secondary" data-action="close-detail">${icon('back')} Back to packages</button><div class="section-label">PACKAGE DETAILS</div><div class="detail-mark">${icon('nuget')}</div><h2>${esc(row.packageId)}</h2><span class="detail-family">${esc(row.group)} family</span><dl><div><dt>Installed declaration</dt><dd><code>${esc(row.version)}</code></dd></div><div><dt>Update type</dt><dd>${badge(row)}</dd></div></dl>${row.target ? `<label class="target-label" for="target-version">Target version</label><select id="target-version" data-key="${esc(row.key)}" ${disabled(state.busy)}>${choices.map((version) => `<option ${version === row.target ? 'selected' : ''}>${esc(version)}</option>`).join('')}</select><p class="detail-hint">A version comparison does not guarantee framework or API compatibility.</p>` : `<p class="detail-hint ${row.error ? 'failure' : ''}">${esc(row.error || (row.status === 'current' ? 'No newer version matches your target policy.' : 'Check for updates to load available versions.'))}</p>`}<div class="declaration"><span class="section-label">DECLARED IN</span><p>${icon('file')}${esc(row.fileLabel)}</p>${row.condition ? `<p class="condition-note">Condition: ${esc(row.condition)}</p>` : ''}<span class="declaration-kind">${esc(row.kind)}</span></div><button class="secondary full" data-action="openFile" data-key="${esc(row.key)}">Open declaration ${icon('external')}</button><button class="text-button full" data-action="packageLink" data-key="${esc(row.key)}">View on nuget.org ${icon('external')}</button></aside>`;
+  /** The node a checkbox, chip or action refers to, within what the view currently shows. */
+  function findNode(id) {
+    for (const group of ctx.groups) {
+      if (group.id === id) return group;
+      const found = group.subgroups.find((sub) => sub.id === id) ?? group.packages.find((node) => node.id === id);
+      if (found) return found;
+    }
+    return ctx.packages.find((node) => node.id === id);
   }
 
-  function renderPlan(plan) {
-    const files = [...new Set(plan.map((change) => change.file))];
-    const major = plan.filter(
-      (change) => state.rows.find((row) => row.key === change.key)?.updateKind === 'major',
-    ).length;
-    return `<main class="review-panel"><button class="text-button" data-action="back" ${disabled(state.busy)}>${icon('back')} Back to packages</button><div class="review-heading"><div class="eyebrow">ONE LAST LOOK</div><h2>Review ${plan.length} package update${plan.length === 1 ? '' : 's'}.</h2><p>${files.length} file${files.length === 1 ? '' : 's'} will be edited.${major ? ` ${major} major update${major === 1 ? '' : 's'} selected; review breaking changes before applying.` : ' Only the selected version declarations will change.'}</p></div>${files
-      .map(
-        (file) =>
-          `<section class="review-file"><header><span>${icon('file')}${esc(plan.find((change) => change.file === file).fileLabel)}</span><button class="secondary" data-action="preview" data-file="${esc(file)}">Open diff ${icon('external')}</button></header>${plan
-            .filter((change) => change.file === file)
-            .map(
-              (change) =>
-                `<div class="review-row"><strong>${esc(change.packageId)}${change.condition ? `<small>${esc(change.condition)}</small>` : ''}</strong><code class="old-version">${esc(change.from)}</code>${icon('arrow')}<code class="target">${esc(change.to)}</code></div>`,
-            )
-            .join('')}</section>`,
-      )
-      .join(
-        '',
-      )}<div class="review-bottom"><p>${icon('check')} Versions are saved using VS Code edits. Shared central versions affect every project that consumes them. Restore and test your solution afterward.</p><button class="primary" data-action="apply" ${disabled(state.busy || !state.trusted)}>${state.busy ? 'Applying…' : `Apply ${plan.length} update${plan.length === 1 ? '' : 's'}`} ${icon('arrow')}</button></div></main>`;
+  /** Keys a control acts on: only visible, available updates. */
+  function keysFor(id) {
+    if (id.startsWith('d:')) return [id.slice(2)];
+    const node = findNode(id);
+    return node ? model.collectKeys(node) : [];
   }
 
-  app.addEventListener('click', (event) => {
-    const button = event.target.closest('button');
-    if (!button || button.disabled) return;
-    if (button.dataset.group !== undefined) {
-      group = button.dataset.group;
-      render();
+  function select(keys, on) {
+    for (const key of keys) {
+      if (on) ui.selected.add(key);
+      else ui.selected.delete(key);
+    }
+  }
+
+  function review(keys) {
+    if (!keys.length) return;
+    ui.selected = new Set(keys);
+    ui.drawer = false;
+    send('review', { keys });
+  }
+
+  function toggle(set, id, on) {
+    if (on ?? !set.has(id)) set.add(id);
+    else set.delete(id);
+  }
+
+  function toggleOpen(id, open) {
+    if (id === 'failures') ui.failuresOpen = open ?? !ui.failuresOpen;
+    else if (id.startsWith('g:')) {
+      const next = open ?? !groupOpen(id);
+      if (narrow.matches) toggle(ui.open, id, next);
+      else toggle(ui.closed, id, !next);
+    } else if (id.startsWith('p:')) toggle(ui.expanded, id, open);
+    schedule();
+  }
+
+  function openDetails(id) {
+    ui.activeId = id;
+    if (narrow.matches) {
+      ui.drawer = true;
+      focusAfter = '.inspector .drawer-head button';
+    }
+  }
+
+  /** The search box keeps its own value while focused, so clearing the query clears the box too. */
+  function clearQuery() {
+    ui.query = '';
+    const input = document.getElementById('query');
+    if (input) input.value = '';
+  }
+
+  function activate(row) {
+    const id = row.dataset.nav;
+    ui.cursor = id;
+    if (id.startsWith('g:') || id === 'failures') toggleOpen(id);
+    else if (id.startsWith('p:')) openDetails(id);
+    else if (id.startsWith('d:')) openDetails(row.dataset.parent);
+    else if (id.startsWith('f:')) {
+      const failed = state.rows.find((item) => item.key === id.slice(2));
+      if (failed) openDetails(packageId(failed));
+    }
+    schedule();
+  }
+
+  function clearFilter(name) {
+    if (name === 'group') ui.group = '';
+    else if (name === 'file') ui.file = '';
+    else if (name === 'kinds') ui.kinds.clear();
+    else if (name === 'showAll') ui.showAll = false;
+    else if (name === 'policy') send('policy', { policy: 'latest', prerelease: state.prerelease });
+    else if (name === 'prerelease') send('policy', { policy: state.policy, prerelease: false });
+  }
+
+  const actions = {
+    refresh: () => send('refresh'),
+    rescan: () => send('rescan'),
+    cancel: () => send('cancel'),
+    back: () => send('back'),
+    apply: () => send('apply'),
+    settings: () => send('settings'),
+    openFolder: () => send('openFolder'),
+    manageTrust: () => send('manageTrust'),
+    preview: (button) => send('preview', { file: button.dataset.file }),
+    openFile: (button) => send('openFile', { key: button.dataset.key }),
+    packageLink: (button) => send('packageLink', { key: button.dataset.key }),
+    'toggle-options': () => (ui.options = !ui.options),
+    'toggle-notes': () => (ui.notesOpen = !ui.notesOpen),
+    'toggle-decls': (button) => toggleOpen(button.dataset.id),
+    dismiss: () => (ui.toast = ''),
+    'clear-selection': () => ui.selected.clear(),
+    'clear-query': () => {
+      clearQuery();
+      focusAfter = '#query';
+    },
+    'reset-filters': () => {
+      clearQuery();
+      ui.group = '';
+      ui.file = '';
+      ui.kinds.clear();
+      ui.showAll = false;
+    },
+    'close-drawer': () => {
+      ui.drawer = false;
+      if (ui.activeId) focusAfter = `.tree [data-nav="${CSS.escape(ui.activeId)}"]`;
+    },
+    'review-selection': () =>
+      review((ctx.selectedRows.length ? ctx.selectedRows : ctx.visibleUpdates).map((row) => row.key)),
+    'review-group': (button) => review(keysFor(button.dataset.id)),
+    'review-kind': (button) =>
+      review(ctx.visibleUpdates.filter((row) => kindOf(row) === button.dataset.kindReview).map((row) => row.key)),
+    'review-node': (button) =>
+      review(
+        state.rows
+          .filter((row) => row.status === 'update' && packageId(row) === button.dataset.id)
+          .map((row) => row.key),
+      ),
+  };
+
+  function onButton(button) {
+    const data = button.dataset;
+    if (data.view) {
+      ui.view = data.view === 'list' ? 'list' : 'groups';
+      ui.cursor = '';
+    } else if (data.group !== undefined) {
+      ui.group = ui.group === data.group ? '' : data.group;
+      ui.cursor = '';
+    } else if (data.sub) {
+      const keys = keysFor(data.sub);
+      select(keys, model.selectionState(keys, ui.selected) !== 'all');
+    } else if (data.policy) send('policy', { policy: data.policy, prerelease: state.prerelease });
+    else if (data.kindOnly) {
+      const only = ui.kinds.size === 1 && ui.kinds.has(data.kindOnly);
+      ui.kinds = new Set(only ? [] : [data.kindOnly]);
+    } else if (data.kind) toggle(ui.kinds, data.kind);
+    else if (data.clear) clearFilter(data.clear);
+    else actions[data.action]?.(button);
+    schedule();
+  }
+
+  root.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    const button = target.closest('button');
+    if (button) {
+      if (!button.disabled) onButton(button);
       return;
     }
-    if (button.dataset.tab) {
-      tab = button.dataset.tab;
-      render();
+    if (target.closest('input, select, label')) return;
+    if (target.closest('.scrim')) {
+      actions['close-drawer']();
+      schedule();
       return;
     }
-    if (button.dataset.focus) {
-      activeKey = button.dataset.focus;
-      detailOpen = true;
-      render();
-      return;
-    }
-    const action = button.dataset.action;
-    if (action === 'close-detail') {
-      detailOpen = false;
-      render();
-    } else if (action === 'update-family') {
-      selected = new Set(familyUpdates().map((row) => row.key));
-      send('review', { keys: [...selected] });
-      persist();
-    } else if (action === 'review') send('review', { keys: selectedRows().map((row) => row.key) });
-    else if (action === 'select-patches') {
-      visible()
-        .filter((row) => row.updateKind === 'patch')
-        .forEach((row) => selected.add(row.key));
-      render();
-    } else if (action === 'clear-filters') {
-      query = '';
-      group = '';
-      file = '';
-      kind = '';
-      render();
-    } else if (action === 'dismiss') {
-      toast = '';
-      render();
-    } else if (action) send(action, { key: button.dataset.key, file: button.dataset.file });
+    const row = target.closest('.tree [data-nav]');
+    if (row) activate(row);
   });
-  app.addEventListener('input', (event) => {
-    if (event.target.id === 'query') {
-      query = event.target.value;
-      render();
-    }
-  });
-  app.addEventListener('change', (event) => {
+
+  root.addEventListener('change', (event) => {
     const input = event.target;
-    if (input.dataset.select) {
-      if (input.checked) selected.add(input.dataset.select);
-      else selected.delete(input.dataset.select);
-    } else if (input.id === 'select-visible')
-      visible()
-        .filter((row) => row.status === 'update')
-        .forEach((row) => {
-          if (input.checked) selected.add(row.key);
-          else selected.delete(row.key);
-        });
-    else if (input.id === 'file') file = input.value;
-    else if (input.id === 'kind') kind = input.value;
-    else if (input.id === 'policy' || input.id === 'prerelease') {
-      send('policy', {
-        policy: document.getElementById('policy').value,
-        prerelease: document.getElementById('prerelease').checked,
-      });
-      return;
-    } else if (input.id === 'target-version') {
-      send('target', { key: input.dataset.key, version: input.value });
-      return;
-    }
-    render();
+    if (input.dataset?.check) select(keysFor(input.dataset.check), input.checked);
+    else if (input.id === 'select-all') select(ctx.visibleKeys, input.checked);
+    else if (input.id === 'prerelease') send('policy', { policy: state.policy, prerelease: input.checked });
+    else if (input.id === 'show-all') ui.showAll = input.checked;
+    else if (input.id === 'file') ui.file = input.value;
+    else if (input.dataset?.targetKey) send('target', { key: input.dataset.targetKey, version: input.value });
+    schedule();
   });
-  window.addEventListener('message', (event) => {
-    if (event.data?.type === 'state') {
-      state = event.data.state;
-      const valid = new Set(updates().map((row) => row.key));
-      selected = new Set([...selected].filter((key) => valid.has(key)));
-      if (!state.files.some((f) => f.uri === file)) file = '';
-      if (group && !state.rows.some((row) => inFamily(row, group))) group = '';
-      render();
-    } else if (event.data?.type === 'error') {
-      toast = event.data.message;
-      render();
-    }
+
+  root.addEventListener('input', (event) => {
+    if (event.target.id !== 'query') return;
+    ui.query = event.target.value;
+    ui.cursor = '';
+    schedule();
   });
-  render();
+
+  function onTreeKey(event, row) {
+    const rows = [...root.querySelectorAll('.tree [data-nav]')];
+    const index = rows.indexOf(row);
+    const id = row.dataset.nav;
+    const expanded = row.getAttribute('aria-expanded');
+    const move = (next) => {
+      if (!next) return;
+      ui.cursor = next.dataset.nav;
+      next.focus();
+      schedule();
+    };
+    if (event.key === 'ArrowDown') move(rows[index + 1]);
+    else if (event.key === 'ArrowUp') move(rows[index - 1]);
+    else if (event.key === 'Home') move(rows[0]);
+    else if (event.key === 'End') move(rows.at(-1));
+    else if (event.key === 'ArrowRight') {
+      if (expanded === 'false') toggleOpen(id, true);
+      else if (expanded === 'true') move(rows[index + 1]);
+    } else if (event.key === 'ArrowLeft') {
+      if (expanded === 'true') toggleOpen(id, false);
+      else move(rows.find((item) => item.dataset.nav === row.dataset.parent));
+    } else if (event.key === ' ') {
+      const box = row.querySelector('input.cb');
+      if (box) select(keysFor(box.dataset.check), !box.checked);
+      else if (expanded) toggleOpen(id);
+      schedule();
+    } else if (event.key === 'Enter') activate(row);
+    else return;
+    event.preventDefault();
+  }
+
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && detailOpen) {
-      detailOpen = false;
-      render();
+    const target = event.target instanceof Element ? event.target : null;
+    if (event.key === 'Escape') {
+      if (ui.drawer) actions['close-drawer']();
+      else if (ui.options) ui.options = false;
+      else if (target?.id === 'query' && ui.query) clearQuery();
+      else return;
+      event.preventDefault();
+      schedule();
+      return;
+    }
+    const row = target?.closest('.tree [data-nav]');
+    if (row && target === row) onTreeKey(event, row);
+  });
+
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (data?.type === 'state' && data.state) {
+      state = data.state;
+      remember();
+      if (!state.busy && !state.recheckPending) {
+        const valid = new Set(state.rows.filter((row) => row.status === 'update').map((row) => row.key));
+        ui.selected = new Set([...ui.selected].filter((key) => valid.has(key)));
+        if (ui.group && state.rows.length && !model.groupView(baseRows()).some((group) => group.id === ui.group))
+          ui.group = '';
+      }
+      if (ui.file && !state.files.some((file) => file.uri === ui.file)) ui.file = '';
+      if (ui.activeId && state.rows.length && !state.rows.some((row) => packageId(row) === ui.activeId)) {
+        ui.activeId = '';
+        ui.drawer = false;
+      }
+      schedule();
+    } else if (data?.type === 'error') {
+      ui.toast = String(data.message ?? 'NuGet operation failed');
+      schedule();
     }
   });
+
+  narrow.addEventListener('change', () => {
+    if (!narrow.matches) ui.drawer = false;
+    schedule();
+  });
+
+  render();
   send('ready');
 })();

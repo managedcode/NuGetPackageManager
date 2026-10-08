@@ -5,24 +5,32 @@
 [![Marketplace version](https://img.shields.io/visual-studio-marketplace/v/ManagedCode.managedcode-nuget-package-manager?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=ManagedCode.managedcode-nuget-package-manager)
 [![NuGet version](https://img.shields.io/nuget/v/nuget-manager.svg)](https://www.nuget.org/packages/nuget-manager)
 [![NuGet downloads](https://img.shields.io/nuget/dt/nuget-manager.svg)](https://www.nuget.org/packages/nuget-manager)
-[![License](https://img.shields.io/github/license/managedcode/NuGetPackageManager.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![VS Code 1.100+](https://img.shields.io/badge/VS%20Code-%E2%89%A51.100-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/updates/v1_100)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![Marketplace workflow](https://img.shields.io/github/actions/workflow/status/managedcode/NuGetPackageManager/marketplace.yml?branch=main&label=Marketplace%20workflow)](https://github.com/managedcode/NuGetPackageManager/actions/workflows/marketplace.yml)
 
-Review NuGet updates across a .NET workspace before changing declarations. Select a package family, inspect every proposed version, and review the complete change set before applying it. The same .NET 10 engine powers the VS Code workbench and the `nuget-manager` command-line tool. The interface uses Managed Code's neutral monochrome branding while following the active VS Code light, dark, or high-contrast theme.
+Update whole NuGet package families in one review, including `Microsoft.*` or a narrower family such as `Microsoft.Orleans.*`. Select a package family, inspect every proposed version, and review the complete change set before applying it. The same .NET 10 engine powers the VS Code workbench and the `nuget-manager` command-line tool. The interface uses Managed Code's neutral monochrome branding while following the active VS Code light, dark, or high-contrast theme.
 
-![NuGet Package Manager workbench](https://raw.githubusercontent.com/managedcode/NuGetPackageManager/main/media/screenshots/workbench.png)
+[Install for VS Code](https://marketplace.visualstudio.com/items?itemName=ManagedCode.managedcode-nuget-package-manager) · [GitHub releases](https://github.com/managedcode/NuGetPackageManager/releases) · [NuGet tool](https://www.nuget.org/packages/nuget-manager)
+
+[![NuGet Package Manager in VS Code: native sidebar, package groups and bulk updates](media/screenshots/workbench.png)](media/screenshots/workbench.png)
+
+The native sidebar and wide editor workbench in VS Code, shown with a sample workspace. Click the screenshot to view it at full size.
 
 ## VS Code
 
-Click the **NuGet** Activity Bar icon to open the native **Packages** sidebar. **NuGet: Open Package Workbench** focuses that view and discovers declarations without opening an editor tab. For the wide, three-column workbench, run **NuGet: Open Package Workbench in Editor** (`nugetPackageManager.openEditor`). You can also open the sidebar from the context menu on a `Directory.Packages.props`, `.csproj`, `.fsproj`, or `.vbproj` file. The sidebar keeps family filters, package selection, and review/apply controls in reach at its compact width.
+Click the **NuGet** Activity Bar icon to open the native **Packages** sidebar. The Activity Bar badge shows the number of packages that have updates. **NuGet: Open Package Workbench** focuses that view and discovers declarations without opening an editor tab. For the wide workbench, run **NuGet: Open Package Workbench in Editor** (`nugetPackageManager.openEditor`). You can also open the sidebar from the context menu on a `Directory.Packages.props`, `.csproj`, `.fsproj`, or `.vbproj` file. Both views use the same package state and review plan. Hiding or reopening one view preserves the active review; closing one view does not cancel work while the other remains open.
 
-Both views use the same package state and review plan. Hiding or reopening one view preserves the active review; closing one view does not cancel work while the other remains open.
+Packages appear **by group first**. Each family of related packages (such as `Aspire`, `Azure` or `Microsoft`) is one row with its update count, the shared version change or a major/minor/patch summary, and an **Update** button that reviews the whole group. Packages outside any family share an **Other packages** group. Open a group to see its packages and its narrower families as one-click selections, for example **Orleans** inside **Microsoft** selects every `Microsoft.Orleans` package but never `Microsoft.OrleansExtra`. Switch to **List** for a flat list of all updates with checkboxes. Every review lists the exact target versions per file and opens native VS Code diffs.
 
-Families use the first package ID segment by default. You can select a narrower dotted prefix, such as `Microsoft.Orleans`; matching includes that exact ID and its dot-delimited descendants, not similarly named IDs such as `Microsoft.OrleansExtra`. Selected updates share one review with exact target versions and native VS Code diffs.
+Search, the **Groups/List** switch and **Prerelease** (include preview versions) are always visible. The filter button opens the version policy (**Latest**, **Minor & patch** within the current major, or **Patch only** within the current minor), update types (major, minor, patch, other), **Show up-to-date packages** and the package file; active filters appear as removable chips. The footer shows the check status and the main **Update** action. Failed feed checks appear in a **Couldn't check** section and are never treated as up to date.
 
-Choose the `latest`, `minor`, or `patch` policy. Stable releases are the default; prereleases are optional. Updates require a trusted workspace. The extension applies version text through VS Code documents, preserving surrounding formatting. Files that were clean are saved; files that already had unsaved edits remain unsaved. A changed document invalidates the full review before edits are applied. Changing a central version affects all projects that consume it.
+With `nugetPackageManager.autoCheck` enabled (default), the view automatically checks configured feeds when it opens, after you apply updates, and when package files change while the view is visible. Automatic checks reuse successful version lists for up to 10 minutes; **Check for Updates** always queries the feeds.
+
+Wide layouts (780 px and wider) show groups, packages and package details side by side, with an updates overview and a one-click patch update. Narrower views open package details in a drawer. Use arrow keys to move, Right/Left to open or close a group, Space to select, Enter to open details and Escape to close the drawer or filter panel.
+
+Updates require a trusted workspace. The extension applies version text through VS Code documents, preserving surrounding formatting. Files that were clean are saved; files that already had unsaved edits remain unsaved. A changed document invalidates the full review before edits are applied. Changing a central version affects all projects that consume it.
 
 The VS Code display name is **NuGet Package Manager by ManagedCode** and the extension ID is `managedcode.managedcode-nuget-package-manager`. Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ManagedCode.managedcode-nuget-package-manager), or install a released `.vsix` from [GitHub Releases](https://github.com/managedcode/NuGetPackageManager/releases) using **Extensions → … → Install from VSIX…**. Release uploads to NuGet and Marketplace independently, without waiting for registry indexing.
 
@@ -57,4 +65,4 @@ Property expressions, ranges, wildcards, and other unsupported versions are visi
 
 ## Development and project
 
-The project follows the [Managed Code Coding AI Framework (MCAF)](https://mcaf.managed-code.com/tutorial). See [development setup](docs/Development/Setup.md), [testing](docs/Testing/Testing.md), and [release operations](docs/Operations/Releasing.md). Public .NET skills are available in [ManagedCode dotnet-skills](https://github.com/managedcode/dotnet-skills). The extension and tool source are MIT licensed; imported MCAF skills carry CC BY 4.0 attribution in [.codex/skills/MCAF-SOURCE.md](.codex/skills/MCAF-SOURCE.md).
+The project follows the [Managed Code Coding AI Framework (MCAF)](https://mcaf.managed-code.com/tutorial). See [development setup](docs/Development/Setup.md), [testing](docs/Testing/Testing.md), and [release operations](docs/Operations/Releasing.md). Public .NET skills are available in [ManagedCode dotnet-skills](https://github.com/managedcode/dotnet-skills). The extension and `nuget-manager` tool are licensed under the [MIT License](LICENSE); imported MCAF skills carry CC BY 4.0 attribution in [.codex/skills/MCAF-SOURCE.md](.codex/skills/MCAF-SOURCE.md).

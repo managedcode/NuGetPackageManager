@@ -10,3 +10,11 @@ package-lock.json
 media/icon.png
 dotnet
 NuGetPackageManager.slnx
+*.brainstorm.md
+*.acceptance.md
+*.plan.md
+coverage
+.cache
+work
+tmp
+.tmp

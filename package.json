@@ -2,7 +2,7 @@
   "name": "managedcode-nuget-package-manager",
   "displayName": "NuGet Package Manager by ManagedCode",
   "description": "Review and update NuGet dependencies by package family, version scope, and declaration file.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "managedcode",
   "license": "MIT",
   "engines": {
@@ -58,22 +58,28 @@
         "icon": "$(package)"
       },
       {
-        "command": "nugetPackageManager.refresh",
-        "title": "Refresh Package Declarations",
+        "command": "nugetPackageManager.checkUpdates",
+        "title": "Check for Updates",
         "category": "NuGet",
         "icon": "$(refresh)"
       },
       {
-        "command": "nugetPackageManager.checkUpdates",
-        "title": "Check for Package Updates",
+        "command": "nugetPackageManager.refresh",
+        "title": "Rescan Package Files",
         "category": "NuGet",
-        "icon": "$(sync)"
+        "icon": "$(search-refresh)"
       },
       {
         "command": "nugetPackageManager.openEditor",
         "title": "Open Package Workbench in Editor",
         "category": "NuGet",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "nugetPackageManager.configureFeeds",
+        "title": "Configure Package Feeds",
+        "category": "NuGet",
+        "icon": "$(settings-gear)"
       }
     ],
     "menus": {
@@ -91,20 +97,30 @@
           "group": "navigation@1"
         },
         {
-          "command": "nugetPackageManager.refresh",
+          "command": "nugetPackageManager.openEditor",
           "when": "view == nugetPackageManager.sidebar",
           "group": "navigation@2"
         },
         {
-          "command": "nugetPackageManager.openEditor",
+          "command": "nugetPackageManager.refresh",
           "when": "view == nugetPackageManager.sidebar",
-          "group": "navigation@3"
+          "group": "1_packages@1"
+        },
+        {
+          "command": "nugetPackageManager.configureFeeds",
+          "when": "view == nugetPackageManager.sidebar",
+          "group": "1_packages@2"
         }
       ]
     },
     "configuration": {
       "title": "NuGet Package Manager",
       "properties": {
+        "nugetPackageManager.autoCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check configured feeds automatically when a package view opens, after updates are applied, and after package files change. Automatic checks reuse versions fetched in the last 10 minutes; Check for Updates always queries the feeds."
+        },
         "nugetPackageManager.feeds": {
           "type": "array",
           "default": [

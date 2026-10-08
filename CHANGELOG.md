@@ -2,6 +2,16 @@
 
 Changes are recorded here for each verified release.
 
+## 0.1.3
+
+- Redesign the Packages view around groups: each package family is one row with an Update button, nested families such as Microsoft.Orleans are one-click selections, and a Groups/List switch shows the same updates flat.
+- Add a visible Prerelease option, an options panel for version policy, update types, up-to-date packages and package file, and removable filter chips.
+- Check feeds automatically when a view opens, after updates are applied and after package files change; reuse successful version lists for 10 minutes and disable with `nugetPackageManager.autoCheck`.
+- Show the number of packages with updates on the NuGet Activity Bar icon and native progress while checking.
+- Keep the list, scroll position and selection stable while checks run; fix overlapping controls and red version text from injected webview styles.
+- Show groups, packages and details side by side in wide layouts and open details in a drawer in the sidebar; add keyboard navigation.
+- Add the Configure Package Feeds command and move Rescan Package Files to the view's overflow menu.
+
 ## 0.1.2
 
 - Add a dedicated NuGet icon to the VS Code Activity Bar and a compact package manager sidebar.

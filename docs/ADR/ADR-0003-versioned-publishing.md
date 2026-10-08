@@ -1,7 +1,7 @@
 # ADR-0003: Version-driven releases and Marketplace publishing
 
 Status: Accepted. Registry uploads run independently with configured publisher credentials.
-Date: 2026-10-07. Cross-cutting operational obligations: OP-REL-001 through OP-REL-005 in [acceptance](../../release-automation.acceptance.md).
+Date: 2026-10-07. Cross-cutting operational obligations: OP-REL-001 through OP-REL-005 in [release operations](../Operations/Releasing.md).
 
 The user wants badges and automatic release/publication after normal builds. Keep package.json as the version source and maintain checked-in .NET/lock versions through one validated bump command. Successful main CI creates vX.Y.Z at the tested current commit and explicitly dispatches Release: GITHUB_TOKEN tag pushes do not trigger push workflows. Historical tags cannot be moved. Stable unchanged versions skip release; retries at the tagged commit may dispatch the idempotent release again.
 
@@ -9,7 +9,7 @@ Release keeps prepublication package, local tool smoke-install, live-feed and re
 
 Alternatives rejected: tag-only GITHUB_TOKEN chaining (never triggers Release); credential-dependent release on every commit (versions are immutable); a third versioning framework; a separate Marketplace rebuild (would diverge from verified assets); PAT-only setup (current Microsoft guidance prefers Entra identity).
 
-All artifacts remain in this repository: README, scripts, tests/ReleaseAutomation, .github/workflows, root execution documents and operations docs. No product engine/UI changes. TASK-015 lead owns shared manifests/workflows and integration; TASK-016 tooling worker exclusively writes the version script/tests; TASK-017 docs worker exclusively writes README/operations; TASK-018 independent reviewer reads only. Dependencies, exact checks and joins are in the root plan before worker implementation.
+All artifacts remain in this repository: README, scripts, tests/ReleaseAutomation, .github/workflows, local execution notes and operations docs. No product engine/UI changes. TASK-015 lead owns shared manifests/workflows and integration; TASK-016 tooling worker exclusively writes the version script/tests; TASK-017 docs worker exclusively writes README/operations; TASK-018 independent reviewer reads only. Dependencies and checks follow the durable release operations and testing documentation.
 
 Rollout: validate helpers and workflow syntax, package the badges, keep 0.1.1 as explicitly requested, push main, observe three-OS CI and the historical-tag skip. Repackage the unpublished Marketplace identity as managedcode-nuget-package-manager at the same initial version; qualify its CI artifact and attach that renamed VSIX to the existing GitHub release with the producing commit recorded. The original tag and published CLI are retained. New-version dispatch is configured and review verified until a human explicitly chooses a future version. Configure the managedcode Marketplace identity once, then enable automatic publishing. If no identity is available, report the exact setup requirement; do not claim Marketplace publication. Rollback disables MARKETPLACE_PUBLISH and reverts workflow changes; existing public versions/tags are retained and future fixes use a new version.
 

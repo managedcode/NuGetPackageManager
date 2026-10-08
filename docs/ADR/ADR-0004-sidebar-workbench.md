@@ -20,7 +20,7 @@ WorkbenchViews owns webview initialization, CSP, subscriptions, broadcasts, surf
 
 ## Ordered implementation and ownership
 
-TASK-020 lead defines contracts/manifests and implements the presentation adapter. TASK-021 owns disjoint CSS and usage/architecture docs. TASK-022 owns actual-host regressions with real HTTP data. TASK-023 independently reviews the joined diff. Exact files, commands, dependencies, escalation and joins are in sidebar-workbench.plan.md. Governance and shared contracts remain lead-owned.
+TASK-020 lead defines contracts/manifests and implements the presentation adapter. TASK-021 owns disjoint CSS and usage/architecture docs. TASK-022 owns actual-host regressions with real HTTP data. TASK-023 independently reviews the joined diff. The feature contract and testing documentation define required behavior and checks. Governance and shared contracts remain lead-owned.
 
 ## Verification and rollout
 
