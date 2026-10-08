@@ -2,6 +2,11 @@
 
 Changes are recorded here for each verified release.
 
+## 0.1.4
+
+- Include existing explicit NuGet project SDK declarations, such as Aspire.AppHost.Sdk, in family reviews and updates in VS Code and the CLI. Preserve versionless or absent SDKs; resolve each dependency's own available versions.
+- Replace the retired Marketplace version badge provider in the README.
+
 ## 0.1.3
 
 - Redesign the Packages view around groups: each package family is one row with an Update button, nested families such as Microsoft.Orleans are one-click selections, and a Groups/List switch shows the same updates flat.

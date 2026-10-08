@@ -98,3 +98,20 @@ test('exposes complete dotted family prefixes without crossing sibling boundarie
   assert.deepEqual(byId.get('Microsoft.OrleansExtra')?.families, ['Microsoft', 'Microsoft.OrleansExtra']);
   assert.equal(byId.get('Microsoft.Extensions.Logging')?.families.includes('Microsoft.Orleans'), false);
 });
+
+test('TST-SDK-017 shared bridge discovers and edits existing explicit SDKs together with libraries', async () => {
+  const text =
+    '\uFEFF<Project>\r\n<!-- 😀 -->\r\n<Sdk Name="Microsoft.NET.Sdk" />\r\n<Sdk Name="Aspire.AppHost.Sdk" Version="13.6.0" />\r\n<PackageReference Include="Aspire.Hosting" Version="13.6.0"/>\r\n</Project>';
+  const result = await engine.parse(text);
+  assert.deepEqual(
+    result.declarations.map((row) => row.kind),
+    ['Sdk', 'PackageReference'],
+  );
+  assert.deepEqual(
+    result.declarations.map((row) => row.group),
+    ['Aspire', 'Aspire'],
+  );
+  const changes = result.declarations.map((row) => ({ ...row, from: row.version, to: '13.6.1' }));
+  assert.equal(await engine.apply(text, changes), text.replaceAll('Version="13.6.0"', 'Version="13.6.1"'));
+  await assert.rejects(engine.apply(text.replace('Version="13.6.0"', 'Version="13.6.2"'), changes), /changed/i);
+});

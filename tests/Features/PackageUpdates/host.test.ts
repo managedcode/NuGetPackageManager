@@ -11,6 +11,7 @@ import {
   waitForSidebarResolution,
 } from './hostFeed';
 import { StateRecorder } from './hostSupport';
+import { runSdkFamilyScenario } from './hostSdkScenarios';
 import { Scenario, verifyManifestContract, runAutomaticCheckScenarios, verifyRecordedContract } from './hostScenarios';
 
 export async function run(): Promise<void> {
@@ -72,6 +73,7 @@ export async function run(): Promise<void> {
       startedAt,
     };
     await runAutomaticCheckScenarios(scenario);
+    await runSdkFamilyScenario(scenario);
 
     // The explicit-flow assertions below run with nugetPackageManager.autoCheck disabled (legacy behavior), so the
     // debounced automatic recheck cannot interleave with their explicit refresh, check, review and apply calls.

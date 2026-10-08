@@ -67,6 +67,22 @@ try {
       'utf8',
     ),
     writeFile(
+      path.join(fixtureRoot, 'SdkApp.csproj'),
+      [
+        '<Project>',
+        '  <!-- SDK and package versions are independently resolved -->',
+        '  <Sdk Name="Microsoft.NET.Sdk" />',
+        '  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.0" />',
+        '  <ItemGroup>',
+        '    <PackageReference Include="Aspire.Hosting" Version="13.6.0" />',
+        '    <PackageReference Include="AspireExtra" Version="13.6.0" />',
+        '  </ItemGroup>',
+        '</Project>',
+        '',
+      ].join('\r\n'),
+      'utf8',
+    ),
+    writeFile(
       path.join(fixtureRoot, 'Malformed.csproj'),
       '<Project><PackageReference Include="Broken" Version="1.0.0"></Project>',
       'utf8',

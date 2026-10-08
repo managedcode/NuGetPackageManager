@@ -26,6 +26,9 @@ export interface WorkbenchApi {
 
 /** Packages that succeed and have a newer listed version when the fixture is first checked. */
 export const updatablePackageIds = [
+  'Aspire.AppHost.Sdk',
+  'Aspire.Hosting',
+  'AspireExtra',
   'Automatic.Package',
   'Buffered.Package',
   'Central.Package',

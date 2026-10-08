@@ -1,6 +1,6 @@
 # Architecture
 
-One repository owns NuGet Package Manager for VS Code and the `nuget-manager` global tool. A single .NET 10 PackageUpdates engine parses declarations, compares official NuGet versions, checks listed feed metadata, matches package families and validates version-only text patches. Presentation and file I/O belong to each host.
+One repository owns NuGet Package Manager for VS Code and the `nuget-manager` global tool. A single .NET 10 PackageUpdates engine parses package declarations and explicit versioned Project child Sdk elements, compares official NuGet versions, checks listed feed metadata, matches package families and validates version-only text patches. Presentation and file I/O belong to each host.
 
 ```mermaid
 flowchart LR
@@ -32,6 +32,8 @@ One responsive renderer serves both surfaces: `dom.js` (escaping, icons, keyed D
 The VSIX bundles the same framework-dependent engine assembled for the NuGet tool. Users need the .NET 10 runtime and `dotnet` on PATH. The extension never downloads an executable at activation. Bridge requests read supplied text and return data; writes remain in the trusted editor host. VS Code saves previously clean documents and preserves previously dirty buffers. The console validates complete original file snapshots before writing and reports failures.
 
 Families come only from engine-provided dotted prefixes: first-segment families such as `Microsoft` and narrower ones such as `Microsoft.Orleans` appear when they group at least two packages. A family update opens one exact review across every affected file. Feed errors remain explicit. Automatic checks (`nugetPackageManager.autoCheck`, default on) run when a surface opens, after Apply and after package-file edits; they reuse successful listed versions for 10 minutes, while explicit checks always query feeds. The frontend uses VS Code theme tokens with the monochrome Managed Code primary action.
+
+Explicit project SDK support is specified in [ADR-0006](ADR/ADR-0006-explicit-sdk-updates.md). SDKs participate in the same per-dependency family reviews; missing declarations are never inserted.
 
 Read [PackageUpdates](Features/PackageUpdates.md), [ADR-0002](ADR/ADR-0002-shared-dotnet-engine.md), [ADR-0004](ADR/ADR-0004-sidebar-workbench.md), [ADR-0005](ADR/ADR-0005-workbench-redesign.md) for contracts. [ADR 0001](ADR/0001-native-workbench.md) records the superseded prototype. No server, database or separate product repository is required.
 

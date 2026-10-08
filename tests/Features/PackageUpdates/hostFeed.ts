@@ -7,6 +7,12 @@ export const registration = {
   items: [
     {
       items: [
+        { catalogEntry: { id: 'Aspire.AppHost.Sdk', version: '13.6.0', listed: true } },
+        { catalogEntry: { id: 'Aspire.AppHost.Sdk', version: '13.6.1', listed: true } },
+        { catalogEntry: { id: 'Aspire.Hosting', version: '13.6.0', listed: true } },
+        { catalogEntry: { id: 'Aspire.Hosting', version: '13.7.0', listed: true } },
+        { catalogEntry: { id: 'AspireExtra', version: '13.6.0', listed: true } },
+        { catalogEntry: { id: 'AspireExtra', version: '13.7.0', listed: true } },
         { catalogEntry: { id: 'Central.Package', version: '1.0.0', listed: true } },
         { catalogEntry: { id: 'Central.Package', version: '2.0.0', listed: true } },
         { catalogEntry: { id: 'Central.Package', version: '3.0.0', listed: false } },
@@ -65,7 +71,7 @@ export async function startFeed(): Promise<TestFeed> {
             ],
           }
         : path.endsWith('/index.json') && path.startsWith('/flat/')
-          ? { versions: ['1.0.0', '1.0.1', '1.1.0', '2.0.0', '3.0.0'] }
+          ? { versions: ['1.0.0', '1.0.1', '1.1.0', '2.0.0', '3.0.0', '13.6.0', '13.6.1', '13.7.0'] }
           : path.startsWith('/registration/') && path.endsWith('/index.json')
             ? {
                 items: [

@@ -198,3 +198,22 @@ test('an empty workspace has no groups and no packages', () => {
   assert.deepEqual(model.groupView([]), []);
   assert.deepEqual(model.packageList([]), []);
 });
+
+test('TST-SDK-017 explicit SDK rows join their existing package family without creating absent SDKs', () => {
+  const libraries = [row('Aspire.Hosting'), row('Aspire.Hosting.Redis')];
+  const sdk = row('Aspire.AppHost.Sdk', { kind: 'Sdk', file: api, fileLabel: 'AppHost.csproj' });
+  const groups = model.groupView([...libraries, sdk]);
+  const aspire = groups.find((group) => group.name === 'Aspire')!;
+  assert.deepEqual(
+    aspire.packages.map((node) => node.name),
+    ['Aspire.AppHost.Sdk', 'Aspire.Hosting', 'Aspire.Hosting.Redis'],
+  );
+  assert.equal(aspire.count, 3);
+  assert.equal(
+    model
+      .groupView(libraries)
+      .flatMap((group) => group.packages)
+      .some((node) => node.name === sdk.packageId),
+    false,
+  );
+});

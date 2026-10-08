@@ -54,9 +54,11 @@ Use `--family Microsoft` for the full first-segment family. Add `--dry-run` to i
 
 The CLI and extension share the same parsing, NuGet version, feed listing, family matching, and edit engine. The CLI reviews proposed file changes before writing; use its dry-run/JSON options for automation and its confirmation option only when you intend to apply the reviewed updates. See [CLI usage](docs/Development/Setup.md#command-line-tool) for the agreed command syntax.
 
+An existing `<Sdk Name="Aspire.AppHost.Sdk" Version="13.6.0" />` is included when updating the **Aspire** family, alongside its libraries. Each dependency uses its own available NuGet versions and selected update policy. Projects without an explicit SDK declaration stay unchanged; the manager never adds SDKs. Versionless SDKs are left alone. SDK versions in `Project Sdk="Name/version"`, `Import` or `global.json` are not handled yet.
+
 ## Supported scope and limits
 
-- Central Package Management in `Directory.Packages.props` and literal `PackageReference` versions in `.csproj`, `.fsproj`, and `.vbproj` files.
+- Central Package Management in `Directory.Packages.props`, literal `PackageReference` versions, and explicit `<Sdk Name="…" Version="…" />` declarations in `.csproj`, `.fsproj`, and `.vbproj` files.
 - First-segment package families and narrower dot-boundary prefixes, with bulk selection and review in both hosts.
 - Listed versions discovered through configured NuGet V3 feeds. Stable versions are the default; prereleases can be included.
 - Exact literal version edits with snapshot validation. Conditional declarations remain independently selectable.

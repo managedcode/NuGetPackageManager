@@ -6,9 +6,10 @@ namespace ManagedCode.NuGet.Core.Features.PackageUpdates;
 public static partial class PackageDocuments
 {
   private sealed record SpanValue(string Value, int Start, int End, string? Condition);
-  private sealed class Frame(string name, int start, int openEnd, Dictionary<string, string> attributes, string? condition)
+  private sealed class Frame(string name, int start, int openEnd, Dictionary<string, string> attributes, string? condition, bool isProjectSdk)
   {
     public string Name { get; } = name;
+    public bool IsProjectSdk { get; } = isProjectSdk;
     public int Start { get; } = start;
     public int OpenEnd { get; } = openEnd;
     public Dictionary<string, string> Attributes { get; } = attributes;
@@ -62,8 +63,9 @@ public static partial class PackageDocuments
         var conditions = stack.Reverse().Select(frame => frame.Attributes.GetValueOrDefault("Condition"))
             .Append(attributes.GetValueOrDefault("Condition")).Where(value => !string.IsNullOrEmpty(value));
         var condition = string.Join(" AND ", conditions);
-        var frame = new Frame(name, index, end + 1, attributes, condition.Length == 0 ? null : condition);
-        if (name is "PackageVersion" or "PackageReference")
+        var isProjectSdk = name == "Sdk" && stack.Count == 1 && stack.Peek().Name == "Project";
+        var frame = new Frame(name, index, end + 1, attributes, condition.Length == 0 ? null : condition, isProjectSdk);
+        if (name is "PackageVersion" or "PackageReference" || frame.IsProjectSdk)
         {
           foreach (Match match in AttributePattern().Matches(raw))
           {
@@ -145,9 +147,10 @@ public static partial class PackageDocuments
       var start = frame.OpenEnd + (value.Length == 0 ? 0 : raw.IndexOf(value, StringComparison.Ordinal));
       parent.Versions.Add(new SpanValue(value, start, start + value.Length, frame.Condition));
     }
-    if (frame.Name is not ("PackageVersion" or "PackageReference")) return;
-    var packageId = frame.Attributes.GetValueOrDefault("Include") ?? frame.Attributes.GetValueOrDefault("Update");
-    if (string.IsNullOrEmpty(packageId)) return;
+    if (frame.Name is not ("PackageVersion" or "PackageReference") && !frame.IsProjectSdk) return;
+    var packageId = frame.IsProjectSdk ? frame.Attributes.GetValueOrDefault("Name") :
+        frame.Attributes.GetValueOrDefault("Include") ?? frame.Attributes.GetValueOrDefault("Update");
+    if (packageId is null || (packageId.Length == 0 && !frame.IsProjectSdk)) return;
     if (frame.Versions.Count == 0 && frame.Name == "PackageVersion")
       ignored.Add(new IgnoredDeclaration(packageId, "No literal Version declaration"));
     foreach (var version in frame.Versions)

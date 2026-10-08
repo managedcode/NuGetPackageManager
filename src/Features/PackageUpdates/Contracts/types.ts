@@ -7,7 +7,7 @@ export interface Declaration {
   version: string;
   start: number;
   end: number;
-  kind: 'PackageVersion' | 'PackageReference';
+  kind: 'PackageVersion' | 'PackageReference' | 'Sdk';
   condition?: string;
   group: string;
   families: string[];

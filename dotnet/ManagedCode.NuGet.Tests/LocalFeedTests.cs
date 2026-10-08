@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
@@ -125,6 +126,74 @@ public sealed class LocalFeedTests
     finally { Directory.Delete(folder, true); }
   }
 
+  [Theory]
+  [InlineData(true)]
+  [InlineData(false)]
+  public async Task CliReviewsAndAppliesAspireSdkAndLibrariesUsingTheirOwnVersions(bool dryRun)
+  {
+    await using var feed = new LocalFeed(packageVersions: new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    {
+      ["Aspire.AppHost.Sdk"] = ["13.6.0", "13.6.1", "14.0.0"],
+      ["Aspire.Hosting"] = ["13.6.0", "13.6.2", "14.0.0"],
+      ["Aspire.Hosting.Redis"] = ["13.5.0", "13.5.1", "14.0.0"],
+      ["AspireExtra"] = ["13.6.0", "13.7.0", "14.0.0"]
+    });
+    var folder = CreateWorkspace();
+    try
+    {
+      var project = Path.Combine(folder, "AppHost.csproj");
+      var library = Path.Combine(folder, "Library.csproj");
+      var original = "<Project>\r\n<!-- 😀 keep -->\r\n<Sdk Name='Microsoft.NET.Sdk'/>\r\n" +
+        "<Sdk Name='Aspire.AppHost.Sdk' Version='13.6.0'/>\r\n<ItemGroup>" +
+        "<PackageReference Include=\"Aspire.Hosting\" Version=\"13.6.0\"/>" +
+        "<PackageReference Include='AspireExtra' Version='13.6.0'/></ItemGroup>\r\n</Project>";
+      var libraryOriginal = "<Project><ItemGroup><PackageReference Include='Aspire.Hosting.Redis' Version='13.5.0'/></ItemGroup></Project>";
+      await File.WriteAllTextAsync(project, original, new UTF8Encoding(true), TestContext.Current.CancellationToken);
+      await File.WriteAllTextAsync(library, libraryOriginal, TestContext.Current.CancellationToken);
+      var result = await RunToolAsync("update", "--path", folder, "--family", "Aspire", "--source", feed.IndexUrl,
+        dryRun ? "--dry-run" : "--yes", "--json");
+      Assert.Equal(0, result.ExitCode);
+      using var json = JsonDocument.Parse(result.Output);
+      Assert.Equal(3, json.RootElement.GetProperty("selectedCount").GetInt32());
+      var targets = json.RootElement.GetProperty("changes").EnumerateArray()
+        .ToDictionary(item => item.GetProperty("packageId").GetString()!, item => item.GetProperty("to").GetString());
+      Assert.Equal("13.6.1", targets["Aspire.AppHost.Sdk"]);
+      Assert.Equal("13.6.2", targets["Aspire.Hosting"]);
+      Assert.Equal("13.5.1", targets["Aspire.Hosting.Redis"]);
+      Assert.DoesNotContain("AspireExtra", targets.Keys);
+      Assert.DoesNotContain(feed.Requests, path => path.Contains("microsoft.net.sdk", StringComparison.OrdinalIgnoreCase));
+      var bytes = await File.ReadAllBytesAsync(project, TestContext.Current.CancellationToken);
+      Assert.True(bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }));
+      var expected = dryRun ? original : original
+        .Replace("Name='Aspire.AppHost.Sdk' Version='13.6.0'", "Name='Aspire.AppHost.Sdk' Version='13.6.1'", StringComparison.Ordinal)
+        .Replace("Include=\"Aspire.Hosting\" Version=\"13.6.0\"", "Include=\"Aspire.Hosting\" Version=\"13.6.2\"", StringComparison.Ordinal);
+      Assert.Equal(expected, Encoding.UTF8.GetString(bytes[3..]));
+      Assert.Equal(dryRun ? libraryOriginal : libraryOriginal.Replace("13.5.0", "13.5.1", StringComparison.Ordinal),
+        await File.ReadAllTextAsync(library, TestContext.Current.CancellationToken));
+    }
+    finally { Directory.Delete(folder, true); }
+  }
+
+  [Fact]
+  public async Task CliRejectsStaleSdkBeforeWritingRelatedLibrary()
+  {
+    var folder = CreateWorkspace();
+    var project = Path.Combine(folder, "AppHost.csproj");
+    var original = "<Project><Sdk Name='Aspire.AppHost.Sdk' Version='1.0.0'/>" +
+      "<ItemGroup><PackageReference Include='Aspire.Hosting' Version='1.0.0'/></ItemGroup></Project>";
+    var changed = original.Replace("Name='Aspire.AppHost.Sdk' Version='1.0.0'", "Name='Aspire.AppHost.Sdk' Version='1.0.1'", StringComparison.Ordinal);
+    await File.WriteAllTextAsync(project, original, TestContext.Current.CancellationToken);
+    await using var feed = new LocalFeed(onFlat: () => File.WriteAllText(project, changed));
+    try
+    {
+      var result = await RunToolAsync("update", "--path", folder, "--family", "Aspire", "--source", feed.IndexUrl, "--yes", "--json");
+      Assert.Equal(1, result.ExitCode);
+      Assert.Contains("changed after discovery", result.Output);
+      Assert.Equal(changed, await File.ReadAllTextAsync(project, TestContext.Current.CancellationToken));
+    }
+    finally { Directory.Delete(folder, true); }
+  }
+
   [Fact]
   public async Task CliSkipsDirectoryAndFileSymlinksOutsideWorkspace()
   {
@@ -213,12 +282,15 @@ public sealed class LocalFeedTests
     private readonly bool _malformedCompression;
     private readonly bool _oversizedDecoded;
     private int _flatCount;
+    private readonly IReadOnlyDictionary<string, string[]>? _packageVersions;
+    public ConcurrentQueue<string> Requests { get; } = new();
     public string IndexUrl { get; }
 
     public LocalFeed(bool failFlat = false, Action? onFlat = null, string? contentEncoding = null,
-        bool malformedCompression = false, bool oversizedDecoded = false)
+        bool malformedCompression = false, bool oversizedDecoded = false, IReadOnlyDictionary<string, string[]>? packageVersions = null)
     {
       _failFlat = failFlat;
+      _packageVersions = packageVersions;
       _onFlat = onFlat;
       _contentEncoding = contentEncoding;
       _malformedCompression = malformedCompression;
@@ -247,6 +319,7 @@ public sealed class LocalFeedTests
                 var first = await reader.ReadLineAsync();
                 while (!string.IsNullOrEmpty(await reader.ReadLineAsync())) { }
                 var path = first?.Split(' ')[1] ?? "";
+                Requests.Enqueue(path);
                 var (status, json) = Respond(root, path);
                 if (_oversizedDecoded && path.StartsWith("/reg/", StringComparison.Ordinal))
                   json += new string(' ', 5_000_001);
@@ -290,18 +363,21 @@ public sealed class LocalFeedTests
                 new Dictionary<string, string> { ["@id"] = root + "reg/", ["@type"] = "RegistrationsBaseUrl/3.6.0" }
       }
       }));
+      var segments = path.Split('/');
+      var packageId = segments.Length > 2 ? segments[2] : "";
+      var versions = _packageVersions?.GetValueOrDefault(packageId) ?? ["1.0.0", "1.1.0", "2.0.0"];
       if (path.StartsWith("/flat/", StringComparison.Ordinal))
       {
         if (Interlocked.Increment(ref _flatCount) == 1) _onFlat?.Invoke();
-        return _failFlat ? ("503 Service Unavailable", "{}") : ("200 OK", "{\"versions\":[\"1.0.0\",\"1.1.0\",\"2.0.0\"]}");
+        return _failFlat ? ("503 Service Unavailable", "{}") : ("200 OK", JsonSerializer.Serialize(new { versions }));
       }
-      if (path.StartsWith("/reg/", StringComparison.Ordinal)) return ("200 OK", """
-                {"items":[{"items":[
-                  {"catalogEntry":{"id":"Microsoft.Orleans.Core","version":"1.0.0","listed":true}},
-                  {"catalogEntry":{"id":"Microsoft.Orleans.Core","version":"1.1.0","listed":true}},
-                  {"catalogEntry":{"id":"Microsoft.Orleans.Core","version":"2.0.0","listed":false}}
-                ]}]}
-                """);
+      if (path.StartsWith("/reg/", StringComparison.Ordinal)) return ("200 OK", JsonSerializer.Serialize(new
+      {
+        items = new[] { new { items = versions.Select((version, index) => new
+        {
+          catalogEntry = new { id = packageId, version, listed = index < versions.Length - 1 }
+        }) } }
+      }));
       return ("404 Not Found", "{}");
     }
 

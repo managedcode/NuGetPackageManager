@@ -47,3 +47,19 @@ Execution contract: TASK-005 through TASK-009 in ADR-0002 define exact disjoint 
 Traceability: REQ-001 → AC-001 → TASK-001/002 → packages.test + host integration; REQ-002 → AC-002/003 → TASK-001/002 → versions.test + actual HTTP tests; REQ-003 → AC-004/007 → TASK-001/002/004 → host and browser evidence; REQ-004 → AC-005 → TASK-001/002/004 → stale snapshot and editor tests; REQ-005 → AC-006 → TASK-002/003 → packaging and CI. Execution ownership and checks are defined in the corresponding ADRs and testing documentation.
 
 Failure behavior: incomplete feed checks remain failed; cancellation leaves unfinished declarations unchecked. Conditional duplicates are separate declarations. Shared central changes affect every consuming project. Property/range/wildcard declarations require manual editing of their owning MSBuild definition. Configured V3 feeds do not claim to implement NuGet.config credentials or source mapping.
+
+## Explicit project SDK updates (REQ-013)
+
+Status: implementation in progress; not released. Owner: lead. Decision: [ADR-0006](../ADR/ADR-0006-explicit-sdk-updates.md).
+
+REQ-013 (functional/contract, must; user request): discover literal `<Sdk Name="Aspire.AppHost.Sdk" Version="13.6.0" />` declarations and update them with the `Aspire` package family in VS Code and CLI. SDKs use the same listed-feed lookup, policy, exact review, snapshot validation and version-only edits as package references. SDK identity comes from `Name`; the declaration kind is `Sdk`. Every dependency resolves its own available version; family membership never forces equal versions or asserts cross-package compatibility.
+
+AC-017: a direct child `Sdk` of the root `Project` with literal Name/Version is independently selectable, grouped with its dotted family and updated in the same review as related libraries, including across files. Keep quotes, BOM, CRLF, comments and all other text unchanged; reject stale SDK edits. Conditional duplicates keep separate keys. Expressions, ranges, wildcards and invalid package IDs are reported for manual handling. Versionless SDKs (including Microsoft.NET.Sdk) are left alone and never sent to NuGet. Fake SDKs in comments, CDATA or unrelated/nested XML are not dependencies.
+
+Out of scope: `Project Sdk="Name/version"`, `Import Sdk`, global.json MSBuild SDK versions, SDK MinVersion resolution, .NET runtime/SDK installation and dependency compatibility solving.
+
+Execution contract: TASK-040 lead owns docs, TypeScript declaration contract, bridge/host regression tests and integration. TASK-041 delegated engine worker owns PackageDocuments.cs, a new SdkDeclarationTests.cs and LocalFeedTests.cs only; starts after this spec/ADR, finishes with inspected diff and complete/blocked/failed/cancelled state. TASK-042 independent read-only reviewer joins after both coding scopes complete. Native collaboration status/wait provides joins. Existing project/runtime/feed boundaries stay intact. No temporary planning files are committed; the analysis and ordered plan live in ADR-0006.
+
+| Requirement | Acceptance | ADR      | Task             | Automated test                                                                                                | Evidence                                       |
+| ----------- | ---------- | -------- | ---------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| REQ-013     | AC-017     | ADR-0006 | TASK-040/041/042 | SDK parser/edit regressions, CLI local HTTP family update, JSON bridge and real VS Code host SDK review/apply | Pending CI for the user-approved 0.1.4 release |
