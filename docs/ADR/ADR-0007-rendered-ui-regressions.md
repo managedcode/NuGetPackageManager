@@ -1,6 +1,6 @@
 # ADR-0007: Rendered UI regression gate
 
-Status: accepted; implementation and CI verification pending. Date: 2026-10-08.
+Status: accepted and implemented. Date: 2026-10-08.
 
 ## Context and decision
 
@@ -14,4 +14,4 @@ TASK-046 lead owns renderer corrections, stress fixture, dependency/configuratio
 
 ## Evidence
 
-Manual renderer inspection found and fixed short filter panels, overflowing deep chips, compressed narrow review names, hidden multi-file review changes and drawer focus escape. Manual verification passed after corrections: review has 33 changes in 3 files, every row is contained, long-name chips wrap at 260 px, short filters retain the list and footer, and Shift-Tab/Escape preserve drawer focus/recovery. Final CI/release evidence is pending.
+Manual renderer inspection found and fixed short filter panels, overflowing deep chips, compressed narrow review names, hidden multi-file review changes and drawer focus escape. Manual verification passed after corrections: review has 33 changes in 3 files, every row is contained, long-name chips wrap at 260 px, short filters retain the list and footer, and Shift-Tab/Escape preserve drawer focus/recovery. [CI passed, including all 16 browser cases](https://github.com/managedcode/NuGetPackageManager/actions/runs/37793447523); [0.1.6 publication passed](https://github.com/managedcode/NuGetPackageManager/actions/runs/37794021241). The initial browser run sampled moving drawer bounds; a condition-based transition wait fixed the measurement race while preserving every geometry assertion.
