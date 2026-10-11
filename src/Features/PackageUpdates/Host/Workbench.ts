@@ -9,6 +9,7 @@ import { readAutoCheck, readFeeds } from './settings';
 import { VersionCache } from './versionCache';
 import { watchWorkspace } from './events';
 import { openPackagePage, revealDeclaration } from './navigation';
+import { saveUpdatedDocuments } from './saving';
 
 /** Automatic checks may reuse cached listed versions; explicit checks always query the feeds. */
 type CheckMode = 'cached' | 'fresh';
@@ -427,20 +428,11 @@ export class Workbench implements MessageTarget, vscode.Disposable {
       }
       if (!(await vscode.workspace.applyEdit(edit)))
         throw new Error('VS Code could not apply the update. No success was recorded.');
-      const saved = await Promise.all(
-        documents
-          .filter(
-            (document) =>
-              plan.some((change) => change.file === document.uri.toString()) && !dirty.has(document.uri.toString()),
-          )
-          .map((document) => document.save()),
-      );
+      // The edit can close/reload document models. Never save the handles captured before it.
       this.state.plan = undefined;
       this.snapshots.clear();
-      if (saved.some((result) => !result))
-        throw new Error(
-          'Updates were applied to editor buffers, but some files could not be saved. Save those files manually.',
-        );
+      this.needsScan = true;
+      await saveUpdatedDocuments(plan, dirty);
       const unsaved = plan.filter((change) => dirty.has(change.file)).map((change) => change.file);
       const dirtyCount = new Set(unsaved).size;
       void vscode.window.showInformationMessage(

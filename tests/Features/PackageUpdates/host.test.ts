@@ -12,6 +12,7 @@ import {
 } from './hostFeed';
 import { StateRecorder } from './hostSupport';
 import { runSdkFamilyScenario } from './hostSdkScenarios';
+import { runDocumentLifetimeScenario } from './hostDocumentScenarios';
 import { Scenario, verifyManifestContract, runAutomaticCheckScenarios, verifyRecordedContract } from './hostScenarios';
 
 export async function run(): Promise<void> {
@@ -363,6 +364,7 @@ export async function run(): Promise<void> {
       'a changed nonselected malformed project must leave the selected file untouched',
     );
     verifyRecordedContract(activeRecorder);
+    await runDocumentLifetimeScenario(workbench, extension.extensionPath);
     console.log(
       'VS Code host integration passed: automatic checks, cache, badge, shared engine, family review, snapshots, edits and undo.',
     );

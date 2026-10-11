@@ -2,6 +2,12 @@
 
 Changes are recorded here for each verified release.
 
+## 0.1.7
+
+- Reopen updated clean documents before saving when VS Code closes their previous editor models during Apply.
+- Preserve previously unsaved buffers and clear already-applied reviews when saving fails; report manual save recovery explicitly.
+- Add real VS Code host regressions for closed-document saves alongside existing stale-plan and undo checks.
+
 ## 0.1.6
 
 - Add a visible Open manager action in the sidebar and use native theme colors for primary controls.
