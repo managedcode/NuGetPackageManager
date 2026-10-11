@@ -17,6 +17,15 @@ function projectText(packageId: string): string {
   ].join('\r\n');
 }
 
+function textTabs(uris: vscode.Uri[]): vscode.Tab[] {
+  return vscode.window.tabGroups.all
+    .flatMap((group) => group.tabs)
+    .filter((tab) => {
+      const input = tab.input;
+      return input instanceof vscode.TabInputText && uris.some((uri) => uri.toString() === input.uri.toString());
+    });
+}
+
 /** AC-022: close an actual clean document after snapshot validation, before the real WorkspaceEdit. */
 export async function runDocumentLifetimeScenario(workbench: WorkbenchApi, extensionPath: string): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
@@ -53,15 +62,20 @@ export async function runDocumentLifetimeScenario(workbench: WorkbenchApi, exten
     assert.equal(workbench.getState().plan?.length, 3);
     assert.equal(Object.isFrozen(extensionApi.workspace), false, 'the extension workspace API supports a scoped hook');
     extensionApi.workspace.applyEdit = async (edit, metadata) => {
-      assert.equal(intercepted, false, 'the reviewed plan must use one real WorkspaceEdit');
+      assert.equal(intercepted, false, 'the reviewed version edit must be intercepted exactly once');
       intercepted = true;
       assert.equal(edit.get(uris[0]).length, 1, 'the selected clean file must be in the real edit');
       assert.equal(oldCleanDocument.isDirty, false, 'the pre-edit model remains clean before closing it');
-      await vscode.window.showTextDocument(oldCleanDocument, { preview: false });
-      await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+      assert.equal(await vscode.window.tabGroups.close(textTabs([uris[0]])), true);
+      // Tab closure leaves API model references cached for three minutes. A native file delete releases them.
+      // Replace only this isolated clean fixture, restoring its exact bytes before the reviewed version edit.
+      const deletion = new vscode.WorkspaceEdit();
+      deletion.deleteFile(uris[0]);
+      assert.equal(await originalApply.call(extensionApi.workspace, deletion), true);
       await poll('the original clean document to close', () => (oldCleanDocument.isClosed ? true : undefined), 10_000);
       // TextDocument is frozen: use the native save rejection, never replace save() or its result.
       await assert.rejects(Promise.resolve(oldCleanDocument.save()), /Document has been closed/);
+      await vscode.workspace.fs.writeFile(uris[0], Buffer.from(originals[0], 'utf8'));
       return originalApply.call(extensionApi.workspace, edit, metadata);
     };
     await workbench.apply();
@@ -83,13 +97,7 @@ export async function runDocumentLifetimeScenario(workbench: WorkbenchApi, exten
     extensionApi.workspace.applyEdit = originalApply;
     // These buffers belong only to the isolated scenario, and their dirty-state assertions have finished.
     if (dirtyDocument && !dirtyDocument.isClosed) await dirtyDocument.save();
-    const tabs = vscode.window.tabGroups.all
-      .flatMap((group) => group.tabs)
-      .filter((tab) => {
-        const input = tab.input;
-        return input instanceof vscode.TabInputText && uris.some((uri) => uri.toString() === input.uri.toString());
-      });
-    await vscode.window.tabGroups.close(tabs);
+    await vscode.window.tabGroups.close(textTabs(uris));
     await rm(fixture.fsPath, { recursive: true, force: true });
   }
 }
