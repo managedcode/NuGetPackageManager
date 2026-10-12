@@ -91,7 +91,7 @@ export function readBadge(workbench: WorkbenchApi): vscode.ViewBadge | undefined
 export function assertBadge(workbench: WorkbenchApi, state: ViewState, context: string): void {
   const expected = updatedIds(state).length;
   const badge = readBadge(workbench);
-  assert.equal(badge?.value, expected || undefined, `${context}: the badge must count distinct packages with updates`);
+  assert.equal(badge?.value, expected, `${context}: the badge must count distinct packages with updates`);
   if (badge) assert.ok(badge.tooltip.includes(String(expected)), `${context}: the tooltip must state the count`);
 }
 
@@ -253,7 +253,7 @@ export function assertServedFromCache(feed: TestFeed, before: Counts, name: stri
 /**
  * Samples host state every few milliseconds, so short-lived activities and the badge while busy are observable.
  * Invariants checked on every sample: busy exactly when an activity is reported, and the badge of a host that is idle
- * with no recheck pending equals the number of distinct packages with updates (omitted, never 0, when there are none).
+ * with no recheck pending equals the number of distinct packages with updates (explicit zero when there are none; native chrome hides zero).
  * While busy or while a recheck is pending the badge keeps its last settled value instead.
  */
 export class StateRecorder {
@@ -288,7 +288,7 @@ export class StateRecorder {
     const badge = readBadge(this.workbench);
     const issues: string[] = [];
     if (state.busy !== (state.activity !== undefined)) issues.push(`busy=${state.busy} but activity=${state.activity}`);
-    if (badge && badge.value <= 0) issues.push(`badge value ${badge.value} must be omitted instead`);
+    if (!badge || badge.value < 0) issues.push('native badge must publish a nonnegative count');
     if (isIdle(state) && (badge?.value ?? 0) !== updatedIds(state).length)
       issues.push(`idle badge ${badge?.value} must equal ${updatedIds(state).length} distinct update packages`);
     if (issues.length && this.violations.length < 20) this.violations.push(`${issues.join('; ')}: ${summarize(state)}`);

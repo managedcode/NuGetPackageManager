@@ -66,8 +66,8 @@ export async function verifyQueuedScanInvalidation(scenario: Scenario): Promise<
     assert.ok(expired.rows.length > 0 && expired.rows.every((row) => row.status === 'unchecked'));
     assert.equal(expired.checkedAt, undefined, 'the invalidated scan has no completed check time');
     assert.equal(
-      readBadge(workbench),
-      undefined,
+      readBadge(workbench)?.value,
+      0,
       'idle unchecked rows must clear the badge before the queued scan starts',
     );
     assertRequests(feed, before, observedPackageIds, 'unchanged', 'a held obsolete scan cannot start feed lookups');

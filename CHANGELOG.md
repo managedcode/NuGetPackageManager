@@ -2,6 +2,11 @@
 
 Changes are recorded here for each verified release.
 
+## 0.1.8
+
+- Clear stale NuGet Activity Bar update counts when no packages have available updates, including on VS Code 1.100.
+- Add native rendered VS Code badge regressions for positive counts, zero updates and count recovery.
+
 ## 0.1.7
 
 - Reopen updated clean documents before saving when VS Code closes their previous editor models during Apply.

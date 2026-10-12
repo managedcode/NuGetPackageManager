@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { createServer } from 'node:net';
 
 const extensionRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'nuget-workbench-host-'));
@@ -17,6 +19,9 @@ const manifest = JSON.parse(
   await (await import('node:fs/promises')).readFile(path.join(extensionRoot, 'package.json'), 'utf8'),
 );
 process.env.NUGET_WORKBENCH_EXTENSION_ID = `${manifest.publisher}.${manifest.name}`;
+// The test bundle lives outside node_modules; resolve the existing browser dependency here.
+process.env.NUGET_WORKBENCH_PLAYWRIGHT_MODULE = createRequire(import.meta.url).resolve('playwright');
+process.env.NUGET_WORKBENCH_BADGE_ARTIFACTS = path.join(extensionRoot, 'test-results', 'host-badge');
 // A terminal inside VS Code exports this; it would make the launched editor run as plain Node.
 delete process.env.ELECTRON_RUN_AS_NODE;
 
@@ -104,6 +109,9 @@ try {
     version: process.env.VSCODE_TEST_VERSION ?? '1.100.0',
     download: downloadAndUnzipVSCode,
   });
+  // Reserve a unique loopback port immediately before launch, then release it for Electron's CDP server.
+  const debuggingPort = await reserveDebuggingPort();
+  process.env.NUGET_WORKBENCH_CDP_ENDPOINT = `http://127.0.0.1:${debuggingPort}`;
   // Assertions run exactly once. Setup retries must never conceal a failing test.
   await runTests({
     vscodeExecutablePath,
@@ -113,10 +121,24 @@ try {
       fixtureRoot,
       '--no-sandbox',
       '--disable-gpu',
+      '--remote-debugging-address=127.0.0.1',
+      `--remote-debugging-port=${debuggingPort}`,
       `--user-data-dir=${userData}`,
       `--extensions-dir=${extensions}`,
     ],
   });
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true });
+}
+
+async function reserveDebuggingPort() {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Could not reserve a loopback debugging port.');
+  await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  return address.port;
 }

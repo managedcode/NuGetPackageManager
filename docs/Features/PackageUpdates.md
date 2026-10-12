@@ -99,3 +99,15 @@ ADR: N/A; this repairs document lifetime handling inside the existing trusted VS
 Execution contract: TASK-050 lead owns Host/Workbench.ts, Host/saving.ts, host.test.ts integration, feature documentation, version files and integration/release. TASK-051 bounded worker owns only tests/Features/PackageUpdates/hostDocumentScenarios.ts after the lead approves the test packet. TASK-052 independent reviewer reads the final diff without writing. Workers return complete/blocked/failed/cancelled; the lead inspects their output and joins final CI. Tests run in CI only under the retained repository direction.
 
 Traceability: REQ-018 → AC-022 → TASK-050/051/052 → hostDocumentScenarios.ts plus existing host stale/dirty/undo assertions → final three-platform CI and patch-release verification (pending). Portable save-failure injection is not added: filesystem permission failures can prompt interactively or behave differently on Windows; the failure branch is independently code-reviewed, and closed-instance save rejection is asserted against the real host.
+
+## Native badge clearing (REQ-019)
+
+REQ-019 (UX/compatibility, must; user-reported stale Activity Bar count): a settled zero-update state removes the visible native badge on every supported VS Code version. Keep the last settled count while busy or awaiting an automatic recheck.
+
+AC-023: native rendered host regression verifies positive → zero → positive recovery, repeated zero, and busy retention; zero never renders a numeral. First sidebar resolution explicitly initializes the zero count. Existing distinct-package, failed/unchecked exclusion and queued-scan assertions remain enforced. The API zero value is intentional: VS Code 1.100 webview views leave an old activity registered when assigned undefined; a zero NumberBadge replaces it and renders no number. Source: [supported VS Code implementation](https://github.com/microsoft/vscode/blob/1.100.0/src/vs/workbench/contrib/webviewView/browser/webviewViewPane.ts#L234-L248).
+
+ADR: N/A; repair inside existing Host/WorkbenchViews.ts, preserving engine/renderer contracts, dependencies, supported runtime and release workflows.
+
+Execution: TASK-053 lead owns WorkbenchViews.ts, existing host expectations, scenario integration, docs/manifests and final delivery. TASK-054 bounded worker owns scripts/test-host.mjs and new tests/Features/PackageUpdates/hostBadgeScenarios.ts only; uses existing Playwright to inspect native chrome, no new dependency. TASK-055 independent read-only reviewer checks the integrated diff after worker completion; all worker states join before push. Tests run in CI only under the retained repository direction.
+
+Traceability: REQ-019 → AC-023 → TASK-053/054/055 → hostBadgeScenarios.ts native screenshots and existing host badge invariants → final three-platform CI/Release (pending).

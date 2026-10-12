@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import type { ViewState } from '../../../src/Features/PackageUpdates/Contracts/types';
 import { TestFeed, waitForSidebarVisibility } from './hostFeed';
 import { verifyQueuedScanInvalidation } from './hostQueueScenarios';
+import { verifyNativeBadgeClearing } from './hostBadgeScenarios';
 import {
   WorkbenchApi,
   updatablePackageIds,
@@ -125,7 +126,7 @@ export async function verifyCheckOnOpen(scenario: Scenario): Promise<ViewState> 
     busy.activities.has('scan') && busy.activities.has('check'),
     `scan and check are reported: ${[...busy.activities]}`,
   );
-  assert.deepEqual([...busy.badges], [undefined], 'the badge must not show partial counts during the first check');
+  assert.deepEqual([...busy.badges], [0], 'the badge must not show partial counts during the first check');
   return state;
 }
 
@@ -354,7 +355,7 @@ export async function editWhileHidden(
     5000,
   );
   assert.ok(!edited.recheckPending, 'no recheck may be scheduled while no surface is visible');
-  assert.equal(readBadge(workbench), undefined, 'unchecked rows with no recheck pending clear the badge');
+  assert.equal(readBadge(workbench)?.value, 0, 'unchecked rows with no recheck pending clear the native badge');
   await assertStaysIdle(workbench, recheckDebounceMs * 2, 'a hidden surface must not start a recheck');
   assertRequests(feed, before, observedPackageIds, 'unchanged', 'a hidden surface must not query the feeds');
   return edit;
@@ -407,8 +408,8 @@ export async function verifyAutoCheckDisabled(scenario: Scenario, settled: ViewS
     `Apply with autoCheck disabled must leave every row unchecked: ${summarize(idle)}`,
   );
   assert.deepEqual(
-    [idle.checkedAt, idle.plan, readBadge(workbench)],
-    [undefined, undefined, undefined],
+    [idle.checkedAt, idle.plan, readBadge(workbench)?.value],
+    [undefined, undefined, 0],
     'unchecked rows have no check time or plan and clear the badge',
   );
   await workbench.refresh();
@@ -442,6 +443,7 @@ export async function verifyAutoCheckDisabled(scenario: Scenario, settled: ViewS
 /** Runs the scenarios in order; each one starts from the settled state the previous one returned. */
 export async function runAutomaticCheckScenarios(scenario: Scenario): Promise<void> {
   const opened = await verifyCheckOnOpen(scenario);
+  await verifyNativeBadgeClearing(scenario);
   const applied = await verifyApplyRechecksFromCache(scenario, opened);
   const refetched = await verifyExplicitChecksRefetch(scenario, applied);
   await verifyRescanCommandUsesCache(scenario, refetched);

@@ -10,7 +10,7 @@ export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Dispos
   panel?: vscode.WebviewPanel;
   private readonly previews = new Map<string, string>();
   private readonly registrations: vscode.Disposable[] = [];
-  private badge?: vscode.ViewBadge;
+  private badge: vscode.ViewBadge = { value: 0, tooltip: 'No packages with updates' };
   private finishProgress?: () => void;
 
   constructor(
@@ -102,9 +102,11 @@ export class WorkbenchViews implements vscode.WebviewViewProvider, vscode.Dispos
   /** Native chrome: the Activity Bar badge keeps the last settled count while busy; the view shows progress. */
   status(updates: number, busy: boolean): void {
     if (!busy) {
-      this.badge = updates
-        ? { value: updates, tooltip: `${updates} package${updates === 1 ? '' : 's'} with updates` }
-        : undefined;
+      // VS Code 1.100 leaves native activity registered for undefined; zero replaces it and renders no number.
+      this.badge = {
+        value: updates,
+        tooltip: `${updates} package${updates === 1 ? '' : 's'} with updates`,
+      };
       if (this.sidebar) this.sidebar.badge = this.badge;
     }
     if (busy && !this.finishProgress) {
