@@ -22,7 +22,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ManagedCode.NuGet.Core/ManagedCode.NuGet.Core.csproj" />
-    <PackageReference Include="Spectre.Console" Version="0.55.0" />
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" Link="README.md" />
