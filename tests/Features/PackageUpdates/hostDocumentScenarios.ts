@@ -30,6 +30,7 @@ function textTabs(uris: vscode.Uri[]): vscode.Tab[] {
 export async function runDocumentLifetimeScenario(workbench: WorkbenchApi, extensionPath: string): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(folder);
+  assert.equal(vscode.workspace.getConfiguration('files').get('enableTrash'), false);
   const fixture = vscode.Uri.joinPath(folder.uri, '.host-document-lifecycle');
   const uris = ['CleanA.csproj', 'CleanB.csproj', 'Dirty.csproj'].map((name) => vscode.Uri.joinPath(fixture, name));
   const originals = [projectText('Central.Package'), projectText('Regular.Package'), projectText('Regular.Package')];

@@ -30,7 +30,13 @@ try {
     cwd: extensionRoot,
     stdio: 'inherit',
   });
-  await Promise.all([mkdir(fixtureRoot), mkdir(userData), mkdir(extensions)]);
+  await Promise.all([mkdir(fixtureRoot), mkdir(path.join(userData, 'User'), { recursive: true }), mkdir(extensions)]);
+  // Temporary workspaces may be on mounts that cannot trash files (for example, Linux CI's /tmp).
+  await writeFile(
+    path.join(userData, 'User', 'settings.json'),
+    `${JSON.stringify({ 'files.enableTrash': false }, null, 2)}\n`,
+    'utf8',
+  );
   await Promise.all([
     writeFile(
       path.join(fixtureRoot, 'Directory.Packages.props'),
